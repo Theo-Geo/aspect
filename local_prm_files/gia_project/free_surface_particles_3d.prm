@@ -1,0 +1,145 @@
+set Dimension                              = 3
+set End time                               = 1e7
+set Use years instead of seconds           = true
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/gia_tests/output-free_surface-particle_3d
+
+# Free surface calculations are typically more difficult to stabilize, and tend
+# to mesh oscillations, in particular for the initial time steps. Thus, we limit
+# the initial time steps to a smaller size (1000 years, and we allow each time
+# step to only grow by 30% compared to the last one to avoid jumps in time step
+# length). We could also reduce the CFL number to decrease all time steps, but
+# that would slow down the whole model instead of just the first time steps.
+set Maximum first time step                = 1e3
+set Maximum relative increase in time step = 30
+set CFL number                             = 1.0
+
+# Pressure normalization must be set to ``no'' for free surface models, as its
+# equations are based on the assumption that the pressure is zero at the free
+# surface.
+set Pressure normalization                 = no
+
+# We can use any of the normal geometry models for free surface modeling, we
+# just need to specify further down which surface is to be the free one. We
+# here use a box model with vertical downwards gravity.
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X extent = 200.e3
+    set Y extent = 200.e3
+    set Z extent = 1 
+    set X repetitions = 2
+    set Y repetitions = 2
+    #set Z periodic = true
+    set Box origin X coordinate = -100e3
+    set Box origin Y coordinate = -100e3
+    set Box origin Z coordinate = -0.5
+  end
+end
+
+subsection Gravity model
+  set Model name = vertical
+
+  subsection Vertical
+    set Magnitude = 10.0
+  end
+end
+
+# Here is the major new section for this parameter file, specifying the
+# parameters for running free surface calculations.
+subsection Mesh deformation
+  set Mesh deformation boundary indicators = top: free surface
+
+  # theta, between zero and one 0.5 default.
+  # zero, no stabilization
+  # one, most stable, rates that it moves damped
+  subsection Free surface
+    set Free surface stabilization theta = 0.5
+  end
+end
+
+# Here we specify that the model has free slip velocity boundary conditions for
+# no boundary condition for top,
+# equivalent to a zero stress boundary condition
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = left, right, bottom, front, back
+end
+
+# zero boundary temperature
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = left, right, bottom, top
+  set List of model names = constant
+
+  subsection Constant
+    set Boundary indicator to temperature mappings = left:0, right:0, bottom:0, top:0
+  end
+end
+
+# Our temperature initial conditions are simply a blob of hot
+# rock in the center of the domain.
+subsection Initial temperature model
+  set Model name = function
+
+  subsection Function
+    set Variable names      = x,y,z
+    set Function expression = sqrt(x^2 + y^2) < 25.e3 ? 200.0 : 0.0
+  end
+end
+
+# A fairly standard simple material model, except we use an
+# artificially low thermal conductivity to keep our anomaly
+# from diffusing too fast.
+subsection Material model
+  set Model name = simpler
+
+  subsection Simpler model
+    set Reference density             = 3300
+    set Reference specific heat       = 1250
+    set Reference temperature         = 0.0
+    set Thermal conductivity          = 1.0
+    set Thermal expansion coefficient = 4e-5
+    set Viscosity                     = 1.e20
+  end
+end
+
+# For simplicity we disable adaptive mesh refinement,
+# although it would significantly speed up this model
+subsection Mesh refinement
+  set Initial adaptive refinement        = 0
+  set Initial global refinement          = 5
+  set Refinement fraction                = 0.3
+  set Coarsening fraction                = 0.05
+  set Strategy                           = temperature, particle density 
+  set Time steps between mesh refinement = 0
+end
+
+# We also include the topography postprocessor, which just calculates
+# the maximum and minimum topography on your free surface at
+# every time step.
+subsection Postprocess
+  set List of postprocessors = visualization, velocity statistics, topography, particles
+
+  subsection Visualization
+    set Time between graphical output = 1.e6
+    set List of output variables = stress, strain rate
+  end
+
+  subsection Particles 
+    set Time between data output = 1e6
+    set Data output format = vtu
+  end
+end
+
+subsection Particles
+  set List of particle properties = integrated strain, integrated strain invariant, velocity 
+  set Particle generator name = ascii file 
+
+  subsection Generator 
+    subsection Ascii file 
+      set Data directory = $ASPECT_SOURCE_DIR/local_prm_files/gia_project/
+      set Data file name = particle_positions_3d.dat
+    end 
+  end 
+end 
+
+

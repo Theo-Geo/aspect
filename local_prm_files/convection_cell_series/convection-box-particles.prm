@@ -1,0 +1,112 @@
+# A description of convection in a 2d box. See the manual for more information.
+
+set Dimension                              = 2
+set Use years instead of seconds           = false
+set End time                               = 0.5
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/convection_cell_series/output_cv_2D_particles
+
+set Pressure normalization                 = surface
+set Surface pressure                       = 0
+
+
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X extent = 1
+    set Y extent = 1
+  end
+end
+
+# initial conditions
+
+subsection Initial temperature model
+  set Model name = function
+
+  subsection Function
+    set Variable names      = x,z
+    set Function constants  = p=0.01, L=1, pi=3.1415926536, k=1
+    set Function expression = (1.0-z) - p*cos(k*pi*x/L)*sin(pi*z)
+  end
+end
+
+# boundary conditions
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = bottom, top
+  set List of model names = box
+
+  subsection Box
+    set Bottom temperature = 1
+    set Left temperature   = 0
+    set Right temperature  = 0
+    set Top temperature    = 0
+  end
+end
+
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = left, right, bottom, top
+end
+
+subsection Gravity model
+  set Model name = vertical
+
+  subsection Vertical
+    set Magnitude = 1e4   # = Ra
+  end
+end
+
+subsection Material model
+  set Model name = simple
+
+  subsection Simple model
+    set Reference density             = 1
+    set Reference specific heat       = 1
+    set Reference temperature         = 0
+    set Thermal conductivity          = 1
+    set Thermal expansion coefficient = 1
+    set Viscosity                     = 1
+  end
+end
+
+subsection Formulation
+  set Formulation = Boussinesq approximation
+end
+
+subsection Mesh refinement
+  set Initial global refinement                = 4
+  set Initial adaptive refinement              = 0
+  set Time steps between mesh refinement       = 0
+end
+
+# postprocessing
+subsection Postprocess
+  set List of postprocessors = visualization, velocity statistics, temperature statistics, particles
+
+  subsection Visualization
+    set Time between graphical output = 0.01
+    set List of output variables = stress, strain rate
+  end
+
+  subsection Particles
+    set Time between data output = 0.01
+    set Data output format       = vtu
+    set Exclude output properties = volume fraction, rotation_matrix
+  end
+end
+
+subsection Particles
+  set List of particle properties = integrated strain, integrated strain invariant, velocity
+  set Particle generator name = ascii file 
+
+  subsection Generator 
+    subsection Ascii file 
+      set Data directory = $ASPECT_SOURCE_DIR/local_prm_files/convection_cell_series/
+      set Data file name = particles_cv.dat
+    end 
+  end 
+end 
+  
+
+subsection Solver parameters
+  set Temperature solver tolerance = 1e-10
+end

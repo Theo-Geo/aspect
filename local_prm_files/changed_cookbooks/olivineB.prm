@@ -7,7 +7,7 @@ set Surface pressure         = 0
 set Nonlinear solver scheme  = single Advection, no Stokes
 set End time                 = 3e5
 set Use years instead of seconds           = false
-set Output directory = /home/theoh/Code/output/out_drex_olivineC
+set Output directory = $ASPECT_SOURCE_DIR/../output/aspect_tests/out_drex_olivine_new
 
 subsection Compositional fields
   set Number of fields = 1
@@ -152,7 +152,7 @@ subsection Particles
     set CPO derivatives algorithm = D-Rex 2004
 
     subsection Initial grains
-      set Minerals = Olivine: C-fabric, Enstatite
+      set Minerals = Olivine: B-fabric, Enstatite
       set Volume fractions minerals = 0.7,0.3
     end
 

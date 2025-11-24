@@ -1,0 +1,102 @@
+# A description of convection in a 3d box. See the manual for more information.
+
+set Dimension                              = 3
+set Use years instead of seconds           = false
+set End time                               = 0.2
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/convection_cell_series/output_cv_3D
+
+set Pressure normalization                 = surface
+set Surface pressure                       = 0
+
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X extent = 1
+    set Y extent = 1e-3
+    set Z extent = 1
+    set Box origin Y coordinate = -5e-4
+
+  end
+end
+
+subsection Initial temperature model
+  set Model name = function
+
+  subsection Function
+    set Variable names      = x,y,z
+    set Function constants  = p=0.01, L=1, pi=3.1415926536, k=1
+    set Function expression = (1.0-z) - p*cos(k*pi*x/L)*sin(pi*z) # (1.0-z) - p*cos(k*pi*x/L)*sin(pi*z)*y^3
+  end
+end
+
+subsection Boundary temperature model
+  set List of model names = box
+  set Fixed temperature boundary indicators   = bottom, top
+
+  subsection Box
+    set Bottom temperature = 1
+    set Left temperature   = 0
+    set Right temperature  = 0
+    set Top temperature    = 0
+  end
+end
+
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = left, right, front, back, bottom, top
+end
+
+subsection Gravity model
+  set Model name = vertical
+
+  subsection Vertical
+    set Magnitude = 1e4 # 1e16 # = Ra / Thermal expansion coefficient
+  end
+end
+
+subsection Material model
+  set Model name = simple
+
+  subsection Simple model
+    set Reference density             = 1
+    set Reference specific heat       = 1
+    set Reference temperature         = 0
+    set Thermal conductivity          = 1
+    set Thermal expansion coefficient = 1 # 1e-10
+    set Viscosity                     = 1
+  end
+end
+
+# The settings above all pertain to the description of the
+# continuous partial differential equations we want to solve.
+# The following section deals with the discretization of
+# this problem, namely the kind of mesh we want to compute
+# on. We here use a globally refined mesh without
+# adaptive mesh refinement.
+subsection Mesh refinement
+  set Initial global refinement                = 3
+  set Initial adaptive refinement              = 3
+  set Time steps between mesh refinement       = 15
+  set Additional refinement times              = 0.003
+end
+
+# postprocessing 
+
+subsection Postprocess
+  set List of postprocessors = velocity statistics, visualization
+
+  subsection Visualization
+    set Time between graphical output = 0.0001
+  end
+end
+
+subsection Checkpointing
+  # The number of timesteps between performing checkpoints. If 0 and time
+  # between checkpoint is not specified, checkpointing will not be performed.
+  # Units: None.
+  set Steps between checkpoint = 50
+end
+
+subsection Solver parameters
+  set Temperature solver tolerance = 1e-10
+end

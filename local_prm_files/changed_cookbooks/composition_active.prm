@@ -10,7 +10,7 @@ set Dimension                              = 2
 set Start time                             = 0
 set End time                               = 1
 set Use years instead of seconds           = false
-set Output directory                       = /home/theoh/Code/output/output-composition-active
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/output-composition-active
 
 subsection Geometry model
   set Model name = box
