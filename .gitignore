@@ -58,6 +58,8 @@
 /tests/*.x.prm
 /tests/lib*.so
 /Testing
+/local_prm_files/other
+/local_prm_files/changed_cookbooks
 
 # used for clion:
 
