@@ -2,11 +2,26 @@
 
 set Dimension                              = 2
 set Use years instead of seconds           = false
-set End time                               = 0.45
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/convection_cell_series/output_cv_2D_CPO
+set End time                               = 0.5
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/convection_cell_series/output_cv_2D_CPO_compressible
 
 set Pressure normalization                 = surface
 set Surface pressure                       = 0
+
+subsection Compositional fields
+  set Number of fields = 1
+  set Names of fields = water
+  set Compositional field methods = static
+end
+
+subsection Initial composition model
+  set Model name = function
+
+  subsection Function
+    set Variable names      = x,y,z
+    set Function expression = 0
+  end
+end
 
 subsection Geometry model
   set Model name = box
@@ -16,6 +31,8 @@ subsection Geometry model
     set Y extent = 1
   end
 end
+
+
 
 # initial conditions
 
@@ -102,8 +119,8 @@ subsection Postprocess
 end
 
 subsection Particles
-  set List of particle properties = integrated strain, integrated strain invariant, velocity,  crystal preferred orientation
-  set Particle generator name = ascii file 
+  set List of particle properties = integrated strain, crystal preferred orientation, integrated strain invariant, velocity, cpo bingham average
+  set Particle generator name = ascii file
 
   subsection Generator 
     subsection Ascii file 
@@ -120,7 +137,7 @@ subsection Particles
     set CPO derivatives algorithm = D-Rex 2004
 
     subsection Initial grains
-      set Minerals = Olivine: B-fabric, Enstatite
+      set Minerals = Olivine: A-fabric, Enstatite
       set Volume fractions minerals = 0.7,0.3
     end
 

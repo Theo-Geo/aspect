@@ -274,12 +274,22 @@ namespace aspect
 
             // even in 2d we need 3d strain-rates and velocity gradient tensors. So we make them 3d by
             // adding an extra dimension which is zero.
+            //Tensor<1,3> velocities_3d; 
+            //velocities_3d[0] = velocities[0]
+            //velocities_3d[1] = velocities[1]
+
             SymmetricTensor<2,3> strain_rate_3d;
             strain_rate_3d[0][0] = strain_rate[0][0];
             strain_rate_3d[0][1] = strain_rate[0][1];
             //sym: strain_rate_3d[1][0] = strain_rate[1][0];
             strain_rate_3d[1][1] = strain_rate[1][1];
-
+            
+            Tensor<2,3> velocity_gradient_3d;
+            velocity_gradient_3d[0][0] = velocity_gradient[0][0];
+            velocity_gradient_3d[0][1] = velocity_gradient[0][1];
+            velocity_gradient_3d[1][0] = velocity_gradient[1][0];
+            velocity_gradient_3d[1][1] = velocity_gradient[1][1];
+            
             if (dim == 3)
               {
                 strain_rate_3d[0][2] = strain_rate[0][2];
@@ -287,14 +297,7 @@ namespace aspect
                 //sym: strain_rate_3d[2][0] = strain_rate[0][2];
                 //sym: strain_rate_3d[2][1] = strain_rate[1][2];
                 strain_rate_3d[2][2] = strain_rate[2][2];
-              }
-            Tensor<2,3> velocity_gradient_3d;
-            velocity_gradient_3d[0][0] = velocity_gradient[0][0];
-            velocity_gradient_3d[0][1] = velocity_gradient[0][1];
-            velocity_gradient_3d[1][0] = velocity_gradient[1][0];
-            velocity_gradient_3d[1][1] = velocity_gradient[1][1];
-            if (dim == 3)
-              {
+              
                 velocity_gradient_3d[0][2] = velocity_gradient[0][2];
                 velocity_gradient_3d[1][2] = velocity_gradient[1][2];
                 velocity_gradient_3d[2][0] = velocity_gradient[2][0];
@@ -302,6 +305,13 @@ namespace aspect
                 velocity_gradient_3d[2][2] = velocity_gradient[2][2];
               }
 
+            else if (!(this->get_material_model().is_compressible()))
+              {
+                strain_rate_3d[2][2] = -(strain_rate[1][1] + strain_rate[0][0]);
+                velocity_gradient_3d[2][2] = -(velocity_gradient[1][1] + velocity_gradient[0][0]);
+              }
+            
+            
             ArrayView<double> data = particle.get_properties();
             const typename DoFHandler<dim>::active_cell_iterator cell(*particle.get_surrounding_cell(),&(this->get_dof_handler()));
 
