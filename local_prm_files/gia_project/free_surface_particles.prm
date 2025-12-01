@@ -32,11 +32,11 @@ subsection Geometry model
   set Model name = box
 
   subsection Box
-    set X extent = 200.e3
+    set X extent = 250.e3
     set Y extent = 200.e3
     set X repetitions = 5
     set Y repetitions = 2
-    set Box origin X coordinate = -100e3
+    set Box origin X coordinate = -125e3
     set Box origin Y coordinate = -100e3
   end
 end
