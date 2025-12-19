@@ -1,0 +1,178 @@
+set Dimension                              = 2
+set Start time                             = 0
+set End time                               = 1e6
+set Use years instead of seconds           = true
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/gia_tests/output-ice-age-load
+set Nonlinear solver scheme                = single Advection, single Stokes
+set Maximum time step                      = 1e3
+set CFL number                             = 0.5
+set Pressure normalization                 = no
+
+### geometry, gravity, mesh ### 
+
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X extent = 300.e3
+    set Y extent = 200.e3
+    set X repetitions = 5
+    set Y repetitions = 2
+    set Box origin X coordinate = -150e3
+  end
+end
+
+subsection Gravity model
+  set Model name = vertical
+
+  subsection Vertical
+    set Magnitude = 9.8
+  end
+end
+
+subsection Mesh deformation
+  set Mesh deformation boundary indicators = top: free surface
+  set Additional tangential mesh velocity boundary indicators = left, right # allow mesh to deform tangentially 
+  subsection Free surface
+    set Free surface stabilization theta = 0.5
+    set Surface velocity projection = normal 
+  end
+end
+
+subsection Mesh refinement
+  set Initial adaptive refinement        = 2
+  set Initial global refinement          = 1
+  set Strategy                           = strain rate
+  set Time steps between mesh refinement = 1
+end
+
+### boundary conditions ### 
+
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = left, right, bottom
+end
+
+# surface loading 
+subsection Boundary traction model 
+  set Prescribed traction boundary indicators = top y: function
+
+  subsection Function 
+    set Variable names = x, y, t
+    set Function constants = g=9.8, x0=50.e3, H0=2.e3, rhoi = 931, t1=90.e3, t2=10.e3
+    #const increase until t1 then decrease until t2 repeatedly 
+    # t_c = t/(floor(t/(t1+t2)) + 1) -> time in the cycle
+    # p0 = g*H0*rhoi
+    # readable: (floor(t_c/t1) == floor(t_c/(t1+t2)) ? -p0*t_c/t1 : -p0*(t2-t_c)/(t2-t1))
+    set Function expression = 0; (abs(x)<x0 ? ( (floor(t/(floor(t/(t1+t2)) + 1)/t1) == floor(t/(floor(t/(t1+t2)) + 1)/(t1+t2))) ? -g*H0*rhoi*t/(floor(t/(t1+t2)) + 1)/t1 : -g*H0*rhoi*(t2-t/(floor(t/(t1+t2)) + 1))/(t2-t1) ) : 0);
+  end 
+end 
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = bottom, top, left, right
+  set List of model names = initial temperature
+end
+
+subsection Initial temperature model
+  set Model name = function
+  subsection Function
+    set Function expression = 293
+  end
+end
+
+### material model ### 
+
+## compositional fields ##
+
+# required!!! adding water content 
+subsection Compositional fields
+  set Number of fields = 1
+  set Names of fields = water
+  set Compositional field methods = static
+end
+
+subsection Initial composition model
+  set Model name = function
+
+  subsection Function
+    set Variable names      = x,y,z
+    set Function expression = 0
+  end
+end
+
+subsection Material model
+  set Model name = simpler
+
+  subsection Simpler model
+    set Reference density             = 3300
+    set Reference specific heat       = 900 # 
+    set Reference temperature         = 273.15 # K
+    set Thermal conductivity          = 3.0
+    set Thermal expansion coefficient = 3e-5 # artificially low
+    set Viscosity                     = 1.e20
+  end
+end
+
+### post process 
+
+subsection Postprocess
+  set List of postprocessors = visualization, velocity statistics, topography, particles,  crystal preferred orientation
+
+  subsection Visualization
+    set Time between graphical output = 1.e4
+    set List of output variables = stress, strain rate
+  end
+
+  subsection Crystal Preferred Orientation
+    set Time between data output = 1.e5
+    set Write in background thread = true
+    set Compress cpo data files = false
+    set Write out raw cpo data = mineral 0: volume fraction, mineral 0: Euler angles #, mineral 1: volume fraction, mineral 1: Euler angles
+    set Write out draw volume weighted cpo data = mineral 0: volume fraction, mineral 0: Euler angles
+  end
+
+  subsection Particles
+    set Time between data output = 1.e4
+    set Data output format       = vtu
+    set Exclude output properties = volume fraction, rotation_matrix
+  end 
+
+end
+
+subsection Particles
+  set List of particle properties = integrated strain invariant, velocity, crystal preferred orientation, cpo bingham average 
+  set Particle generator name = ascii file 
+
+  subsection Generator 
+    subsection Ascii file 
+      set Data directory = $ASPECT_SOURCE_DIR/local_prm_files/gia_project/particle_positions/
+      set Data file name = particles_ice_age.dat
+    end 
+  end 
+
+  subsection Crystal Preferred Orientation
+    set Random number seed = 301
+    set Number of grains per particle = 500
+    set Property advection method = Backward Euler
+    set Property advection tolerance = 1e-15
+    set CPO derivatives algorithm = D-Rex 2004
+
+    subsection Initial grains
+      set Minerals = Olivine: A-fabric, Enstatite
+      set Volume fractions minerals = 0.7,0.3
+    end
+
+    subsection D-Rex 2004
+      set Mobility = 125
+      set Stress exponents = 3.5
+      set Exponents p = 1.5
+      set Nucleation efficiency = 5
+      set Threshold GBS = 0.3
+    end
+  end
+
+  subsection CPO Bingham Average
+    set Random number seed = 200
+  end
+end 
+
+
