@@ -2,7 +2,7 @@ set Dimension                              = 2
 set Start time                             = 0
 set End time                               = 1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/gia_tests/output-viscoelastic-short
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/out-ve-0
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes

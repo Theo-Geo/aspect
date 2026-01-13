@@ -2,7 +2,7 @@ set Dimension                              = 2
 set Start time                             = 0
 set End time                               = 1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/gia_tests/output-viscoelastic-short
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/out-ve-densities
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
@@ -99,7 +99,7 @@ subsection Material model
 
   subsection Viscoelastic
     # viscoelastic specifications 
-    set Densities                   = 4450
+    set Densities                   = 3300, 3300, 3300, 3300, 3300, 3300, 3300, 3300, 2900
     # background, compositional fields = Ncomp + 1
     set Viscosities                 = 5.0e20, 5.0e20, 5.0e20, 5.0e20, 5.0e20, 5.0e20, 5.0e20, 1.0e19, 1.e40
     set Elastic shear moduli        = 175.e9, 175.e9, 175.e9, 175.e9, 175.e9, 175.e9, 175.e9, 175.e9, 45.e9
