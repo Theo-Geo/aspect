@@ -2,7 +2,7 @@ set Dimension                              = 2
 set Start time                             = 0
 set End time                               = 1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/gia_tests/output-viscoelastic-short
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/out-ve-cheap
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
@@ -14,8 +14,8 @@ set Use operator splitting                 = true
 subsection Solver parameters
 
   subsection Stokes solver parameters 
-    set Number of cheap Stokes solver steps = 0 
-    set Linear solver tolerance = 1e-8 # standart
+    set Number of cheap Stokes solver steps = 300
+    set Linear solver tolerance = 1e-7 # standart
     set GMRES solver restart length = 100 # standart 
   end
 

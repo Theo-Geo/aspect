@@ -2,7 +2,7 @@ set Dimension                              = 2
 set Start time                             = 0
 set End time                               = 1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/gia_tests/output-viscoelastic-short
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/out-ve-AMR-fct
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
@@ -40,8 +40,8 @@ subsection Geometry model
   subsection Box
     set X extent = 500.e3
     set Y extent = 500.e3
-    set X repetitions = 20
-    set Y repetitions = 20
+    set X repetitions = 10
+    set Y repetitions = 10
     set Box origin X coordinate = -250e3
   end
 end
@@ -64,10 +64,17 @@ subsection Mesh deformation
 end
 
 subsection Mesh refinement
-  set Initial adaptive refinement        = 0 # 2
-  set Initial global refinement          = 0 # 2
+  set Initial adaptive refinement        = 2
+  set Initial global refinement          = 0
+  set Time steps between mesh refinement = 1
   #set Strategy                           = strain rate
-  set Time steps between mesh refinement = 0 # 2
+  set Strategy                           =  minimum refinement function
+  subsection Minimum refinement function
+    set Coordinate system   = cartesian
+	  set Variable names      = x,y
+    set Function constants  = Tasth=200.e3, Tlith=45.e3, Dbox=500.e3
+	  set Function expression = y>=Dbox-Tasth-Tlith ? y>=Dbox-Tlith && abs(x)<=100.e3 ? 2 : 1 : 0
+  end
 end
 
 ### material model ### 
