@@ -58,6 +58,7 @@
 /tests/*.x.prm
 /tests/lib*.so
 /Testing
+/local_prm_files/other
 
 # used for clion:
 
