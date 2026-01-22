@@ -2,7 +2,7 @@ set Dimension                              = 2
 set Start time                             = 0
 set End time                               = 1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/out-ve-densities
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-base
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
@@ -14,14 +14,14 @@ set Use operator splitting                 = true
 subsection Solver parameters
 
   subsection Stokes solver parameters 
-    set Number of cheap Stokes solver steps = 300
-    set Linear solver tolerance = 1e-7 # standart
+    set Number of cheap Stokes solver steps = 300 # 0 standart
+    set Linear solver tolerance = 1e-7 # 1e-8 standart
     set GMRES solver restart length = 100 # standart 
   end
 
   subsection Operator splitting parameters
     set Reaction solver type               = fixed step  
-    set Reaction time step                 = 5000
+    set Reaction time step                 = 5e6
     set Reaction time steps per advection step = 1
   end
 end
@@ -31,7 +31,6 @@ subsection Discretization
   set Temperature polynomial degree     = 1 #standart 2
 end
 
-
 ### geometry, gravity, mesh ### 
 
 subsection Geometry model
@@ -40,9 +39,8 @@ subsection Geometry model
   subsection Box
     set X extent = 500.e3
     set Y extent = 500.e3
-    set X repetitions = 20
-    set Y repetitions = 20
-    set Box origin X coordinate = -250e3
+    set X repetitions = 10
+    set Y repetitions = 10
   end
 end
 
@@ -64,10 +62,17 @@ subsection Mesh deformation
 end
 
 subsection Mesh refinement
-  set Initial adaptive refinement        = 0 # 2
-  set Initial global refinement          = 0 # 2
+  set Initial adaptive refinement        = 2
+  set Initial global refinement          = 1
+  set Time steps between mesh refinement = 1
   #set Strategy                           = strain rate
-  set Time steps between mesh refinement = 0 # 2
+  set Strategy                           =  minimum refinement function
+  subsection Minimum refinement function
+    set Coordinate system   = cartesian
+	  set Variable names      = x,y
+    set Function constants  = Tasth=200.e3, Tlith=45.e3, Dbox=500.e3
+	  set Function expression = y>=Dbox-Tasth-Tlith ? y>=Dbox-Tasth ? 2 : 1 : 0
+  end
 end
 
 ### material model ### 
@@ -88,7 +93,7 @@ subsection Initial composition model
 
   subsection Function
     set Variable names      = x,y
-    set Function constants = Tasth=200.e3, Tlith=45.e3, Dbox=500.e3, Rasth=100.e3
+    set Function constants = Tasth=200.e3, Tlith=45.e3, Dbox=500.e3, ylith=10e3
     # 6xstress, Asth, lith
     set Function expression = 0; 0; 0; 0; 0; 0; (y<=Dbox-Tlith && y>=Dbox-Tasth-Tlith) ? 1 : 0 ; (y>Dbox-Tlith ? 1 : 0); 
   end
@@ -99,8 +104,8 @@ subsection Material model
   set Model name =  viscoelastic
 
   subsection Viscoelastic
-    # viscoelastic specifications 
-    set Densities                   = 3300, 3300, 2900
+    # viscoelastic specifications see Dziewonski & Anderson 1980 and Weerdesteijn 2022
+    set Densities                   = 3300
     # background, compositional fields = Ncomp + 1
     set Viscosities                 = 5.0e20, 1.0e19, 1.e40
     set Elastic shear moduli        = 175.e9, 175.e9, 45.e9
@@ -128,7 +133,7 @@ subsection Boundary traction model
 
   subsection Function 
     set Variable names = x, y, t
-    set Function constants = g=9.8, x0=50.e3, H0=2.e3, rhoi = 931, t1=90.e3, t2=10.e3
+    set Function constants = g=9.8, x0=100.e3, H0=2.e3, rhoi = 931, t1=90.e3, t2=10.e3
     # const. increase until t1 then decrease until t2 
     # repeat until end time  
     # n_cyc = floor(t/(t1+t2))
@@ -136,7 +141,7 @@ subsection Boundary traction model
     # p0 = g*H0*rhoi
     # readable: t_cyc =< t1 ? -p0*t_c/t1 : -p0*(t1+t2-t_c)/t2)
     # probably wrong actually. 
-    set Function expression = 0; abs(x)<x0 ? (t-(t1+t2)*floor(t/(t1+t2)) <= t1) ? -g*H0*rhoi*(t-(t1+t2)*floor(t/(t1+t2)))/t1 : -g*H0*rhoi*(t2+t1-(t-(t1+t2)*floor(t/(t1+t2))))/t2 : 0;
+    set Function expression = 0; x<x0 ? (t-(t1+t2)*floor(t/(t1+t2)) <= t1) ? -g*H0*rhoi*(t-(t1+t2)*floor(t/(t1+t2)))/t1 : -g*H0*rhoi*(t2+t1-(t-(t1+t2)*floor(t/(t1+t2))))/t2 : 0;
   end 
 end 
 
@@ -172,6 +177,10 @@ subsection Postprocess
     set Data output format       = vtu
   end 
 
+  subsection Topography
+    set Output to file = true
+    set Time between text output = 0
+  end
 end
 
 subsection Particles
@@ -180,8 +189,8 @@ subsection Particles
 
   subsection Generator
     subsection Ascii file
-      set Data directory = $ASPECT_SOURCE_DIR/local_prm_files/gia_project/particle_positions/
-      set Data file name = particles_ve.dat
+      set Data directory = $ASPECT_SOURCE_DIR/local_prm_files/viscoelastic-loading-series/
+      set Data file name = particles_layer.dat
     end 
   end 
 end
