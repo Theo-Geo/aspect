@@ -2,11 +2,11 @@ set Dimension                              = 2
 set Start time                             = 0
 set End time                               = 200
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-ws-values
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-ws-denser
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
-set Maximum time step                      = 1
+set Maximum time step                      = 2.5
 set CFL number                             = 0.5
 set Pressure normalization                 = no
 set Use operator splitting                 = true
@@ -38,10 +38,10 @@ subsection Geometry model
   set Model name = box
 
   subsection Box
-    set X extent = 500.e3
-    set Y extent = 500.e3
-    set X repetitions = 10
-    set Y repetitions = 10
+    set X extent = 1500.e3
+    set Y extent = 2891e3
+    set X repetitions = 15
+    set Y repetitions = 30
   end
 end
 
@@ -63,7 +63,7 @@ subsection Mesh deformation
 end
 
 subsection Mesh refinement
-  set Initial adaptive refinement        = 2
+  set Initial adaptive refinement        = 4
   set Initial global refinement          = 1
   set Time steps between mesh refinement = 1
   #set Strategy                           = strain rate
@@ -71,8 +71,8 @@ subsection Mesh refinement
   subsection Minimum refinement function
     set Coordinate system   = cartesian
 	  set Variable names      = x,y
-    set Function constants  = Tasth=350.e3, Tlith=70.e3, Dbox=500.e3
-	  set Function expression = y>=Dbox-100e3 ? y>=Dbox-Tasth ? 3 : 1 : 0
+    set Function constants  = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=2891e3
+	  set Function expression = y>=Dbox-100e3 ? y>=Dbox-Tum ? 4 : 2 : 1
   end
 end
 
@@ -84,9 +84,9 @@ end
 
 ## compositional fields ##
 subsection Compositional fields
-  set Number of fields = 8 
-  set Names of fields = ve_stress_xx, ve_stress_yy, ve_stress_xy, ve_stress_xx_old, ve_stress_yy_old, ve_stress_xy_old, Asth, Lith
-  set Types of fields = stress, stress, stress, stress, stress, stress, chemical composition, chemical composition 
+  set Number of fields = 9
+  set Names of fields = ve_stress_xx, ve_stress_yy, ve_stress_xy, ve_stress_xx_old, ve_stress_yy_old, ve_stress_xy_old, TZ, Asth, Lith
+  set Types of fields = stress, stress, stress, stress, stress, stress, chemical composition, chemical composition, chemical composition
 end
 
 subsection Initial composition model
@@ -94,10 +94,11 @@ subsection Initial composition model
 
   subsection Function
     set Variable names      = x,y
-    set Function constants = Tasth=350.e3, Tlith=70.e3, Dbox=500.e3, yLith=20e3, yTZ=100e3
+    set Function constants = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=2891e3, yLith=20e3, yTZ=100e3
     # 6xstress, Asth, lith
     set Function expression = 0; 0; 0; 0; 0; 0; \
-      0.5*(1+tanh((y-(Dbox-Tasth-Tlith))/yTZ))-0.5*(1+tanh((y-(Dbox-Tlith))/yLith)); \
+      0.5*(1+tanh((y-(Dbox-Tum-Tlith-TTZ))/yTZ))-0.5*(1+tanh((y-(Dbox-Tum-Tlith))/yTZ)); \
+      0.5*(1+tanh((y-(Dbox-Tum-Tlith))/yTZ))-0.5*(1+tanh((y-(Dbox-Tlith))/yLith)); \
       0.5*(1+tanh((y-(Dbox-Tlith))/yLith))
   end
 end
@@ -108,11 +109,11 @@ subsection Material model
   set Material averaging =  harmonic average only viscosity
 
   subsection Viscoelastic
-    # viscoelastic specificaltion as in spandau 2011
+    # viscoelastic specificaltion as in spanda 2011
     set Densities                   = 4491.76 # 3871, 3438, 3037
     # background, compositional fields = Ncomp + 1
-    set Viscosities                 = 1.e21, 1.e21, 1.e40 # 5.0e20, 1.0e19, 1.e40 
-    set Elastic shear moduli        = 1.05490e11, 0.70363e11, 0.50605e11 # 175.e9, 175.e9, 45.e9 #
+    set Viscosities                 = 2.e21, 1.e21, 1.e21, 1.e40 # 5.0e20, 1.0e19, 1.e40 
+    set Elastic shear moduli        =  2.28340e11, 1.05490e11, 0.70363e11, 0.50605e11 # 175.e9, 175.e9, 45.e9 #
     set Viscosity averaging scheme  = harmonic
 
     # elastic rheology
@@ -136,13 +137,7 @@ subsection Boundary traction model
   subsection Function 
     set Variable names = x, y, t
     set Function constants = g=9.8, x0=100.e3, H0=1e2, rhoi = 931, t1=100, 
-    # const. increase until t1 then decrease until t2 
-    # repeat until end time  
-    # n_cyc = floor(t/(t1+t2))
-    # t_c = t-(t1+t2)*n_cyc -> time in the cycle
-    # p0 = g*H0*rhoi
-    # readable: t_cyc =< t1 ? -p0*t_c/t1 : -p0*(t1+t2-t_c)/t2)
-    # set Function expression = 0; x<x0 ? (t-(t1+t2)*floor(t/(t1+t2)) <= t1) ? -g*H0*rhoi*(t-(t1+t2)*floor(t/(t1+t2)))/t1 : -g*H0*rhoi*(t2+t1-(t-(t1+t2)*floor(t/(t1+t2))))/t2 : 0;
+    # const. increase until t1 then hold
     set Function expression = 0; x<x0 ? (t<t1 ? -g*H0*rhoi*t/t1 : -g*H0*rhoi) : 0;
   end 
 end 

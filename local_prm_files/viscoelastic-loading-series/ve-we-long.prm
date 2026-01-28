@@ -1,31 +1,30 @@
 set Dimension                              = 2
 set Start time                             = 0
-set End time                               = 200
+set End time                               = 1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-ws-values
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-base
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
-set Maximum time step                      = 1
+set Maximum time step                      = 1e3
 set CFL number                             = 0.5
 set Pressure normalization                 = no
-set Use operator splitting                 = true
+set Use operator splitting                 = true 
 
 subsection Solver parameters
 
   subsection Stokes solver parameters 
-    set Number of cheap Stokes solver steps = 0 # 0 standart
+    set Number of cheap Stokes solver steps = 300 # 0 standart
     set Linear solver tolerance = 1e-7 # 1e-8 standart
     set GMRES solver restart length = 100 # standart 
   end
 
   subsection Operator splitting parameters
     set Reaction solver type               = fixed step  
-    set Reaction time step                 = 5.0e6
+    set Reaction time step                 = 5e6
     set Reaction time steps per advection step = 1
   end
 end
-
 
 subsection Discretization
   set Use discontinuous composition discretization = true
@@ -71,8 +70,8 @@ subsection Mesh refinement
   subsection Minimum refinement function
     set Coordinate system   = cartesian
 	  set Variable names      = x,y
-    set Function constants  = Tasth=350.e3, Tlith=70.e3, Dbox=500.e3
-	  set Function expression = y>=Dbox-100e3 ? y>=Dbox-Tasth ? 3 : 1 : 0
+    set Function constants  = Tasth=200.e3, Tlith=45.e3, Dbox=500.e3
+	  set Function expression = y>=Dbox-Tasth-Tlith ? y>=Dbox-Tasth ? 2 : 1 : 0
   end
 end
 
@@ -94,30 +93,32 @@ subsection Initial composition model
 
   subsection Function
     set Variable names      = x,y
-    set Function constants = Tasth=350.e3, Tlith=70.e3, Dbox=500.e3, yLith=20e3, yTZ=100e3
+    set Function constants = Tasth=200.e3, Tlith=45.e3, Dbox=500.e3, ylith=10e3
     # 6xstress, Asth, lith
-    set Function expression = 0; 0; 0; 0; 0; 0; \
-      0.5*(1+tanh((y-(Dbox-Tasth-Tlith))/yTZ))-0.5*(1+tanh((y-(Dbox-Tlith))/yLith)); \
-      0.5*(1+tanh((y-(Dbox-Tlith))/yLith))
+    set Function expression = 0; 0; 0; 0; 0; 0; (y<=Dbox-Tlith && y>=Dbox-Tasth-Tlith) ? 1 : 0 ; (y>Dbox-Tlith ? 1 : 0); 
   end
 end
 
 subsection Material model
-  #set Material averaging = harmonic average
+  set Material averaging = harmonic average only viscosity
   set Model name =  viscoelastic
-  set Material averaging =  harmonic average only viscosity
 
   subsection Viscoelastic
-    # viscoelastic specificaltion as in spandau 2011
-    set Densities                   = 4491.76 # 3871, 3438, 3037
+    # LM6, LM5, LM4, LM3, LM2, LM1, TZ, UM2, UM1, LT
+    # 3.2e21, 3.2e21, 1.5e21, 0.5e21, 0.5e21, 0.5e21, 1.e40 
+    # 1.702e11, 1.064e11, 0.764e11, 0.667e11, 0.596e11
+    # Weerdesteijn 2024 
+    set Densities                   = 4491.76
     # background, compositional fields = Ncomp + 1
-    set Viscosities                 = 1.e21, 1.e21, 1.e40 # 5.0e20, 1.0e19, 1.e40 
-    set Elastic shear moduli        = 1.05490e11, 0.70363e11, 0.50605e11 # 175.e9, 175.e9, 45.e9 #
+    set Viscosities                 = 1.e21, 1.e21, 1.e40 
+    set Elastic shear moduli        = 1.05490e11, 0.70363e11, 0.50605e11 # 175.e9, 175.e9, 45.e9
+    # set Thermal conductivities = 
     set Viscosity averaging scheme  = harmonic
 
     # elastic rheology
     set Use fixed elastic time step = true
-    set Fixed elastic time step     = 2.5
+    set Fixed elastic time step     = 2.5e3
+    #set use_oper
     #set Use stress averaging        = false
     
   end
@@ -135,15 +136,15 @@ subsection Boundary traction model
 
   subsection Function 
     set Variable names = x, y, t
-    set Function constants = g=9.8, x0=100.e3, H0=1e2, rhoi = 931, t1=100, 
+    set Function constants = g=9.8, x0=100.e3, H0=2.e3, rhoi = 931, t1=90.e3, t2=10.e3
     # const. increase until t1 then decrease until t2 
     # repeat until end time  
     # n_cyc = floor(t/(t1+t2))
     # t_c = t-(t1+t2)*n_cyc -> time in the cycle
     # p0 = g*H0*rhoi
     # readable: t_cyc =< t1 ? -p0*t_c/t1 : -p0*(t1+t2-t_c)/t2)
-    # set Function expression = 0; x<x0 ? (t-(t1+t2)*floor(t/(t1+t2)) <= t1) ? -g*H0*rhoi*(t-(t1+t2)*floor(t/(t1+t2)))/t1 : -g*H0*rhoi*(t2+t1-(t-(t1+t2)*floor(t/(t1+t2))))/t2 : 0;
-    set Function expression = 0; x<x0 ? (t<t1 ? -g*H0*rhoi*t/t1 : -g*H0*rhoi) : 0;
+    # probably wrong actually. 
+    set Function expression = 0; x<x0 ? (t-(t1+t2)*floor(t/(t1+t2)) <= t1) ? -g*H0*rhoi*(t-(t1+t2)*floor(t/(t1+t2)))/t1 : -g*H0*rhoi*(t2+t1-(t-(t1+t2)*floor(t/(t1+t2))))/t2 : 0;
   end 
 end 
 
@@ -170,19 +171,19 @@ subsection Postprocess
   set List of postprocessors = visualization, velocity statistics, topography, composition statistics, particles
 
   subsection Visualization
-    set Time between graphical output = 10
-    set List of output variables = stress, strain rate, material properties, named additional outputs
-  end
-
-  subsection Topography
-    set Output to file = true
-    set Time between text output = 0
+    set Time between graphical output = 5.e3
+    set List of output variables = stress, strain rate, material properties 
   end
 
   subsection Particles
-    set Time between data output = 10
+    set Time between data output = 5.e3
     set Data output format       = vtu
   end 
+
+  subsection Topography
+    set Output to file = true
+    set Time between text output = 5.e3
+  end
 end
 
 subsection Particles
@@ -196,7 +197,6 @@ subsection Particles
     end 
   end 
 end
-
 
     
 

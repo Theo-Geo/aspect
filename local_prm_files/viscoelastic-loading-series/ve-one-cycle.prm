@@ -1,12 +1,12 @@
 set Dimension                              = 2
 set Start time                             = 0
-set End time                               = 200
+set End time                               = 1.1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-ws-values
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-cycle
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
-set Maximum time step                      = 1
+set Maximum time step                      = 1e3
 set CFL number                             = 0.5
 set Pressure normalization                 = no
 set Use operator splitting                 = true
@@ -117,7 +117,7 @@ subsection Material model
 
     # elastic rheology
     set Use fixed elastic time step = true
-    set Fixed elastic time step     = 2.5
+    set Fixed elastic time step     = 1e3
     #set Use stress averaging        = false
     
   end
@@ -135,15 +135,15 @@ subsection Boundary traction model
 
   subsection Function 
     set Variable names = x, y, t
-    set Function constants = g=9.8, x0=100.e3, H0=1e2, rhoi = 931, t1=100, 
+    set Function constants = g=9.8, x0=100.e3, H0=1e3, rhoi = 931, t1=90e3, t2=10e3
     # const. increase until t1 then decrease until t2 
     # repeat until end time  
     # n_cyc = floor(t/(t1+t2))
     # t_c = t-(t1+t2)*n_cyc -> time in the cycle
     # p0 = g*H0*rhoi
     # readable: t_cyc =< t1 ? -p0*t_c/t1 : -p0*(t1+t2-t_c)/t2)
-    # set Function expression = 0; x<x0 ? (t-(t1+t2)*floor(t/(t1+t2)) <= t1) ? -g*H0*rhoi*(t-(t1+t2)*floor(t/(t1+t2)))/t1 : -g*H0*rhoi*(t2+t1-(t-(t1+t2)*floor(t/(t1+t2))))/t2 : 0;
-    set Function expression = 0; x<x0 ? (t<t1 ? -g*H0*rhoi*t/t1 : -g*H0*rhoi) : 0;
+    set Function expression = 0; x<x0 ? (t-(t1+t2)*floor(t/(t1+t2)) <= t1) ? -g*H0*rhoi*(t-(t1+t2)*floor(t/(t1+t2)))/t1 : -g*H0*rhoi*(t2+t1-(t-(t1+t2)*floor(t/(t1+t2))))/t2 : 0;
+    # set Function expression = 0; x<x0 ? (t<t1 ? -g*H0*rhoi*t/t1 : -g*H0*rhoi) : 0;
   end 
 end 
 
@@ -170,7 +170,7 @@ subsection Postprocess
   set List of postprocessors = visualization, velocity statistics, topography, composition statistics, particles
 
   subsection Visualization
-    set Time between graphical output = 10
+    set Time between graphical output = 5e3
     set List of output variables = stress, strain rate, material properties, named additional outputs
   end
 
@@ -180,7 +180,7 @@ subsection Postprocess
   end
 
   subsection Particles
-    set Time between data output = 10
+    set Time between data output = 5e3
     set Data output format       = vtu
   end 
 end
