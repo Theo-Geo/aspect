@@ -1,12 +1,12 @@
-set Dimension                              = 2
+set Dimension                              = 3
 set Start time                             = 0
-set End time                               = 200
+set End time                               = 1.1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-ws-denser
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/ve-gia-benchmark/output_viscoelastic_gia_long_3d
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
-set Maximum time step                      = 2.5
+set Maximum time step                      = 50
 set CFL number                             = 0.5
 set Pressure normalization                 = no
 set Use operator splitting                 = true
@@ -14,7 +14,7 @@ set Use operator splitting                 = true
 subsection Solver parameters
 
   subsection Stokes solver parameters 
-    set Number of cheap Stokes solver steps = 0 # 0 standart
+    set Number of cheap Stokes solver steps = 2000 # 0 standart
     set Linear solver tolerance = 1e-7 # 1e-8 standart
     set GMRES solver restart length = 100 # standart 
   end
@@ -29,7 +29,7 @@ end
 
 subsection Discretization
   set Use discontinuous composition discretization = true
-  set Temperature polynomial degree     = 1 #standart 2
+  set Temperature polynomial degree = 1 #standart 2
 end
 
 ### geometry, gravity, mesh ### 
@@ -39,9 +39,11 @@ subsection Geometry model
 
   subsection Box
     set X extent = 1500.e3
-    set Y extent = 2891e3
+    set Y extent = 1500.e3
+    set Z extent = 2891e3
     set X repetitions = 15
-    set Y repetitions = 30
+    set Y repetitions = 15
+    set Z repetitions = 30
   end
 end
 
@@ -55,7 +57,7 @@ end
 
 subsection Mesh deformation
   set Mesh deformation boundary indicators = top: free surface
-  set Additional tangential mesh velocity boundary indicators = left, right # allow mesh to deform tangentially 
+  set Additional tangential mesh velocity boundary indicators = left, right, front, back # allow mesh to deform tangentially 
   subsection Free surface
     set Free surface stabilization theta = 0.5
     set Surface velocity projection = normal 
@@ -70,9 +72,9 @@ subsection Mesh refinement
   set Strategy                           =  minimum refinement function
   subsection Minimum refinement function
     set Coordinate system   = cartesian
-	  set Variable names      = x,y
+	  set Variable names      = x,y, z
     set Function constants  = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=2891e3
-	  set Function expression = y>=Dbox-100e3 ? y>=Dbox-Tum ? 4 : 2 : 1
+	  set Function expression = z>=Dbox-100e3 ? z>=Dbox-Tum ? 4 : 1 : 1
   end
 end
 
@@ -84,22 +86,23 @@ end
 
 ## compositional fields ##
 subsection Compositional fields
-  set Number of fields = 9
-  set Names of fields = ve_stress_xx, ve_stress_yy, ve_stress_xy, ve_stress_xx_old, ve_stress_yy_old, ve_stress_xy_old, TZ, Asth, Lith
-  set Types of fields = stress, stress, stress, stress, stress, stress, chemical composition, chemical composition, chemical composition
+  set Number of fields = 15
+  set Names of fields = ve_stress_xx, ve_stress_yy, ve_stress_zz, ve_stress_xy, ve_stress_xz, ve_stress_yz, ve_stress_xx_old, ve_stress_yy_old, ve_stress_zz_old, ve_stress_xy_old, ve_stress_xz_old, ve_stress_yz_old, TZ, Asth, Lith
+  set Types of fields = stress, stress, stress, stress, stress, stress, stress, stress, stress, stress, stress, stress, chemical composition, chemical composition, chemical composition
 end
 
 subsection Initial composition model
   set Model name = function
 
   subsection Function
-    set Variable names      = x,y
-    set Function constants = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=2891e3, yLith=20e3, yTZ=100e3
+    set Variable names      = x, y, z
+    set Function constants = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=2891e3, zLith=20e3, zTZ=100e3
     # 6xstress, Asth, lith
     set Function expression = 0; 0; 0; 0; 0; 0; \
-      0.5*(1+tanh((y-(Dbox-Tum-Tlith-TTZ))/yTZ))-0.5*(1+tanh((y-(Dbox-Tum-Tlith))/yTZ)); \
-      0.5*(1+tanh((y-(Dbox-Tum-Tlith))/yTZ))-0.5*(1+tanh((y-(Dbox-Tlith))/yLith)); \
-      0.5*(1+tanh((y-(Dbox-Tlith))/yLith))
+      0; 0; 0; 0; 0; 0; \
+      0.5*(1+tanh((z-(Dbox-Tum-Tlith-TTZ))/zTZ))-0.5*(1+tanh((z-(Dbox-Tum-Tlith))/zTZ)); \
+      0.5*(1+tanh((z-(Dbox-Tum-Tlith))/zTZ))-0.5*(1+tanh((z-(Dbox-Tlith))/zLith)); \
+      0.5*(1+tanh((z-(Dbox-Tlith))/zLith))
   end
 end
 
@@ -117,8 +120,8 @@ subsection Material model
     set Viscosity averaging scheme  = harmonic
 
     # elastic rheology
-    set Use fixed elastic time step = true
-    set Fixed elastic time step     = 2.5
+    set Use fixed elastic time step = false
+    set Fixed elastic time step     = 50
     #set Use stress averaging        = false
     
   end
@@ -127,23 +130,24 @@ end
 ### boundary conditions ### 
 
 subsection Boundary velocity model
-  set Tangential velocity boundary indicators = left, right, bottom
+  set Tangential velocity boundary indicators = left, right, bottom, front, back
 end
 
 ## surface loading 
 subsection Boundary traction model 
-  set Prescribed traction boundary indicators = top y: function
+  set Prescribed traction boundary indicators = top z: function
 
   subsection Function 
-    set Variable names = x, y, t
-    set Function constants = g=9.8, x0=100.e3, H0=1e2, rhoi = 931, t1=100, 
+    set Variable names = x, y, z, t
+    set Function constants = g=9.8, r0=100.e3, H0=1e2, rhoi = 931, t1=90e3, t2=100e3 
     # const. increase until t1 then hold
-    set Function expression = 0; x<x0 ? (t<t1 ? -g*H0*rhoi*t/t1 : -g*H0*rhoi) : 0;
+    set Function expression = 0; 0; (x^2+y^2)<r0^2 ? t<t1 ? -g*H0*rhoi*t/t1 : t<t2 ? -g*H0*rhoi*(1-(t-t1)/(t2-t1)) : 0 : 0;
+    # 0; x<x0 ? (t<t1 ? -g*H0*rhoi*t/t1 : -g*H0*rhoi) : 0;
   end 
 end 
 
 subsection Boundary temperature model
-  set Fixed temperature boundary indicators = bottom, top, left, right
+  set Fixed temperature boundary indicators = bottom, top, left, right, front, back 
   set List of model names = initial temperature
 end
 
@@ -162,34 +166,17 @@ end
 ### post process 
 
 subsection Postprocess
-  set List of postprocessors = visualization, velocity statistics, topography, composition statistics, particles
+  set List of postprocessors = visualization, velocity statistics, topography, composition statistics
 
   subsection Visualization
-    set Time between graphical output = 10
-    set List of output variables = stress, strain rate, material properties, named additional outputs
+    set Time between graphical output = 10000
+    set List of output variables = strain rate, material properties, named additional outputs
   end
 
   subsection Topography
     set Output to file = true
-    set Time between text output = 0
+    set Time between text output = 1000
   end
-
-  subsection Particles
-    set Time between data output = 10
-    set Data output format       = vtu
-  end 
-end
-
-subsection Particles
-  set List of particle properties =  integrated strain invariant, velocity, 
-  set Particle generator name =  ascii file
-
-  subsection Generator
-    subsection Ascii file
-      set Data directory = $ASPECT_SOURCE_DIR/local_prm_files/viscoelastic-loading-series/
-      set Data file name = particles_layer.dat
-    end 
-  end 
 end
 
 

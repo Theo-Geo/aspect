@@ -1,12 +1,12 @@
 set Dimension                              = 2
 set Start time                             = 0
-set End time                               = 200
+set End time                               = 1.1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/viscoelastic-series/output-ve-ws-denser
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/ve-gia-benchmark/output_viscoelastic_gia_long_2d
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
-set Maximum time step                      = 2.5
+set Maximum time step                      = 50
 set CFL number                             = 0.5
 set Pressure normalization                 = no
 set Use operator splitting                 = true
@@ -117,8 +117,8 @@ subsection Material model
     set Viscosity averaging scheme  = harmonic
 
     # elastic rheology
-    set Use fixed elastic time step = true
-    set Fixed elastic time step     = 2.5
+    set Use fixed elastic time step = false
+    set Fixed elastic time step     = 50
     #set Use stress averaging        = false
     
   end
@@ -136,9 +136,9 @@ subsection Boundary traction model
 
   subsection Function 
     set Variable names = x, y, t
-    set Function constants = g=9.8, x0=100.e3, H0=1e2, rhoi = 931, t1=100, 
+    set Function constants = g=9.8, x0=100.e3, H0=1e2, rhoi = 931, t1=90e3, t2=100e3
     # const. increase until t1 then hold
-    set Function expression = 0; x<x0 ? (t<t1 ? -g*H0*rhoi*t/t1 : -g*H0*rhoi) : 0;
+    set Function expression = 0; x<x0 ? t<t1 ? -g*H0*rhoi*t/t1 : t<t2 ? -g*H0*rhoi*(1-(t-t1)/(t2-t1)) : 0 : 0;
   end 
 end 
 
@@ -162,34 +162,17 @@ end
 ### post process 
 
 subsection Postprocess
-  set List of postprocessors = visualization, velocity statistics, topography, composition statistics, particles
+  set List of postprocessors = visualization, velocity statistics, topography, composition statistics
 
   subsection Visualization
-    set Time between graphical output = 10
-    set List of output variables = stress, strain rate, material properties, named additional outputs
+    set Time between graphical output = 10000
+    set List of output variables = strain rate, material properties, named additional outputs
   end
 
   subsection Topography
     set Output to file = true
-    set Time between text output = 0
+    set Time between text output = 1000
   end
-
-  subsection Particles
-    set Time between data output = 10
-    set Data output format       = vtu
-  end 
-end
-
-subsection Particles
-  set List of particle properties =  integrated strain invariant, velocity, 
-  set Particle generator name =  ascii file
-
-  subsection Generator
-    subsection Ascii file
-      set Data directory = $ASPECT_SOURCE_DIR/local_prm_files/viscoelastic-loading-series/
-      set Data file name = particles_layer.dat
-    end 
-  end 
 end
 
 
