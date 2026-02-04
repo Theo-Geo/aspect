@@ -407,7 +407,7 @@ namespace aspect
                const double aniso_viscosity, 
                const double strainratenorm) const
     {
-      return etaasterisk + (stressy/strainratenorm); //aniso_viscosity
+      return etaasterisk + (stressy*aniso_viscosity); // /strainratenorm
     }
 
     /**
@@ -495,11 +495,7 @@ namespace aspect
                              "Whether to use the analytical or the finite difference derivative for the Newton method.");
           prm.declare_entry("Base model","simple",
                             Patterns::Selection(MaterialModel::get_valid_model_names_pattern<dim>()),
-                            "The name of a material model that will be modified by a replacing"
-                            "the viscosity in the lithosphere by a constant value. Valid values for this parameter "
-                            "are the names of models that are also valid for the "
-                            "``Material models/Model name'' parameter. See the documentation for "
-                            "more information.");
+                            "Name of the material model from which the evaluate function is called.");
         }
         prm.leave_subsection();
       }
@@ -530,7 +526,7 @@ namespace aspect
           use_analytical_derivative  = prm.get_bool ("Use analytical derivative");
 
           AssertThrow( prm.get("Base model") != "Tosi benchmark",
-                       ExcMessage("You may not use ``replace lithosphere viscosity'' as the base model for "
+                       ExcMessage("You may not use ``Tosi benchmark'' as the base model for "
                                   "the Tosi benchmark.") );
 
           // create the base model and initialize its SimulatorAccess base

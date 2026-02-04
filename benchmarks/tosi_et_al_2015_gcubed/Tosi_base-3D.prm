@@ -9,17 +9,19 @@
 # We add the necessary plugins through a shared library
 set Additional shared libraries            = ./libtosi_benchmark.so
 
+set Output directory                       = output-Case1_3d
+
 # This is a 2D benchmark.
-set Dimension                              = 2
+set Dimension                              = 3
 
 # We run the model from time = 0 to time = 1 and to handle
 # the nonlinearity of the viscosity correctly, we use
 # the iterated Advection and Stokes nonlinear solver with 200 cheap
 # Stokes solves.
 set Use years instead of seconds           = false
-set End time                               = 0.5
+set End time                               = 1
 set Nonlinear solver scheme                = iterated Advection and Stokes
-set Max nonlinear iterations               = 30
+set Max nonlinear iterations               = 200
 set Nonlinear solver tolerance             = 1e-7
 
 # We choose a zero average pressure
@@ -41,12 +43,12 @@ subsection Geometry model
 
   subsection Box
     set X extent = 1
-    set Y extent = 1
+    set Y extent = 0.0625
+    set Z extent = 1
+    set X repetitions = 16
+    set Y repetitions = 1
+    set Z repetitions = 16
   end
-end
-
-subsection Mesh refinement
-  set Initial global refinement = 4
 end
 
 # We prescribe a linear temperature profile that
@@ -56,7 +58,7 @@ subsection Initial temperature model
   set Model name = function
 
   subsection Function
-    set Variable names      = x,z
+    set Variable names      = x, y, z
     set Function constants  = A=0.01, pi=3.1415926536
     set Function expression = (1.0-z) + A*cos(pi*x)*sin(pi*z)
   end
@@ -75,13 +77,15 @@ subsection Boundary temperature model
     set Left temperature   = 0
     set Right temperature  = 0
     set Top temperature    = 0
+    set Front temperature  = 0
+    set Back temperature   = 0
   end
 end
 
 subsection Boundary velocity model
   # Here, all four sides of the box allow tangential
   # unrestricted flow but with a zero normal component:
-  set Tangential velocity boundary indicators = left, right, bottom, top
+  set Tangential velocity boundary indicators = left, right, bottom, top, front, back
 end
 
 subsection Formulation
@@ -125,7 +129,8 @@ subsection Material model
     set Initial viscosity        = 1e-1
     set Minimum viscosity        = 1e-6
     set Maximum viscosity        = 10
-  end
+    #set Base model               = CPO-induced anisotropic viscosity
+  end 
 end
 
 # The settings above all pertain to the description of the
@@ -135,6 +140,7 @@ end
 # on. We here use a globally refined mesh without
 # adaptive mesh refinement.
 subsection Mesh refinement
+  set Initial global refinement                = 0
   set Initial adaptive refinement              = 0
   set Time steps between mesh refinement       = 0
 end

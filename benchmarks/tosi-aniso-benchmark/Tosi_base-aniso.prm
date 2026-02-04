@@ -10,7 +10,7 @@
 set Additional shared libraries            = ./libtosi-aniso.so
 
 # This is a 2D benchmark.
-set Dimension                              = 3
+set Dimension                              = 2
 
 # We run the model from time = 0 to time = 1 and to handle
 # the nonlinearity of the viscosity correctly, we use
@@ -40,11 +40,16 @@ subsection Geometry model
   set Model name = box
 
   subsection Box
-    set X extent = 1
-    set Y extent = 1
-    set Z extent = 1
+    set X repetitions = 16
+    set Y repetitions = 16
   end
 end
+
+subsection Mesh refinement
+  set Initial global refinement           = 0
+  set Initial adaptive refinement         = 0
+  set Time steps between mesh refinement  = 0
+end 
 
 # We prescribe a linear temperature profile that
 # matches the boundary conditions defined below plus
@@ -53,7 +58,7 @@ subsection Initial temperature model
   set Model name = function
 
   subsection Function
-    set Variable names      = x, y, z
+    set Variable names      = x,z
     set Function constants  = A=0.01, pi=3.1415926536
     set Function expression = (1.0-z) + A*cos(pi*x)*sin(pi*z)
   end
@@ -72,15 +77,13 @@ subsection Boundary temperature model
     set Left temperature   = 0
     set Right temperature  = 0
     set Top temperature    = 0
-    set Front temperature  = 0
-    set Back temperature   = 0
   end
 end
 
 subsection Boundary velocity model
   # Here, all four sides of the box allow tangential
   # unrestricted flow but with a zero normal component:
-  set Tangential velocity boundary indicators = left, right, bottom, top, front, back
+  set Tangential velocity boundary indicators = left, right, bottom, top
 end
 
 subsection Formulation

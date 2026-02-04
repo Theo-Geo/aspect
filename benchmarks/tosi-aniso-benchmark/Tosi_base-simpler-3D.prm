@@ -8,16 +8,16 @@
 
 # We add the necessary plugins through a shared library
 set Additional shared libraries            = ./libtosi-aniso.so
-
+set Output directory                       = output-Case1_3d_simpler
 # This is a 2D benchmark.
-set Dimension                              = 2
+set Dimension                              = 3
 
 # We run the model from time = 0 to time = 1 and to handle
 # the nonlinearity of the viscosity correctly, we use
 # the iterated Advection and Stokes nonlinear solver with 200 cheap
 # Stokes solves.
 set Use years instead of seconds           = false
-set End time                               = 1
+set End time                               = 0.2
 set Nonlinear solver scheme                = iterated Advection and Stokes
 set Max nonlinear iterations               = 200
 set Nonlinear solver tolerance             = 1e-7
@@ -39,11 +39,21 @@ end
 subsection Geometry model
   set Model name = box
 
-  subsection Box
+   subsection Box
     set X extent = 1
-    set Y extent = 1
+    set Y extent = 0.0625
+    set Z extent = 1
+    set X repetitions = 16
+    set Y repetitions = 1
+    set Z repetitions = 16
   end
 end
+
+subsection Mesh refinement
+  set Initial global refinement           = 0
+  set Initial adaptive refinement         = 0
+  set Time steps between mesh refinement  = 0
+end 
 
 # We prescribe a linear temperature profile that
 # matches the boundary conditions defined below plus
@@ -52,7 +62,7 @@ subsection Initial temperature model
   set Model name = function
 
   subsection Function
-    set Variable names      = x,z
+    set Variable names      = x, y, z
     set Function constants  = A=0.01, pi=3.1415926536
     set Function expression = (1.0-z) + A*cos(pi*x)*sin(pi*z)
   end
@@ -71,13 +81,15 @@ subsection Boundary temperature model
     set Left temperature   = 0
     set Right temperature  = 0
     set Top temperature    = 0
+    set Front temperature  = 0
+    set Back temperature   = 0
   end
 end
 
 subsection Boundary velocity model
   # Here, all four sides of the box allow tangential
   # unrestricted flow but with a zero normal component:
-  set Tangential velocity boundary indicators = left, right, bottom, top
+  set Tangential velocity boundary indicators = left, right, bottom, top, front, back
 end
 
 subsection Formulation
@@ -130,40 +142,7 @@ subsection Material model
   end
 end
 
-# The settings above all pertain to the description of the
-# continuous partial differential equations we want to solve.
-# The following section deals with the discretization of
-# this problem, namely the kind of mesh we want to compute
-# on. We here use a globally refined mesh without
-# adaptive mesh refinement.
-subsection Mesh refinement
-  set Initial adaptive refinement              = 0
-  set Time steps between mesh refinement       = 0
-end
 
-# The final part is to specify what ASPECT should do with the
-# solution once computed at the end of every time step. The
-# process of evaluating the solution is called `postprocessing'
-# and we choose to compute velocity and temperature statistics,
-# statistics about the heat flux through the boundaries of the
-# domain, and to generate graphical output files for later
-# visualization. These output files are created every time
-# a time step crosses time points separated by 0.05. Given
-# our start time (0.0) and final time (1.0) this means that
-# we will obtain 20 output files.
-#
-# The statistics file includes the data reported in Tosi et al. (2015):
-# - average temperature (temperature statistics)
-# - top and bottom Nusselt numbers (heat flux statistics)
-# - Vrms over the whole domain (velocity statistics)
-# - Vrms along the surface (velocity boundary statistics)
-# - Vmax along the surface (velocity boundary statistics)
-# - average rate of viscous dissipation (TosiPostprocessor)
-# - average rate of work against gravity (TosiPostprocessor)
-# - percentage error difference work and dissipation (TosiPostprocessor)
-#
-# Tosi et al. (2015) also report depth averages; averages for viscosity
-# and temperature are produced every 0.05 units of time.
 subsection Postprocess
   set List of postprocessors = velocity statistics, temperature statistics, heat flux statistics, \
                                visualization, TosiPostprocessor, depth average, velocity boundary statistics

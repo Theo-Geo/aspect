@@ -190,8 +190,8 @@ namespace aspect
           if  ((this->simulator_is_past_initialization()) && (this->get_timestep_number() > 0) && (in.temperature[q]>1000) && (std::isfinite(determinant(deviatoric_strain_rate))) && (anisotropic_viscosity != nullptr))
             {
               // Create constant value to use for AV
-              const double A_o = 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
-              const double n = 3.5;
+              const double A_o = 1; // 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
+              const double n = 1; //3.5;
               // The values of A_o and 0.73 were picked so that Gamma = 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=1000 microns
               const double Gamma = (A_o/(std::pow(grain_size,0.73)));
 
@@ -462,6 +462,18 @@ namespace aspect
           prm.declare_entry ("Grain size", "1e-3",
                              Patterns::Double(),
                              "Olivine anisotropic viscosity is dependent of grain size. Value is given in meters");
+          // prm.declare_entry ("Fluidity constant", "1.1e5",
+          //                    Patterns::Double(),
+          //                    "");
+          // prm.declare_entry ("Activation energy", "530000",
+          //                    Patterns::Double(),
+          //                    "Activation energy for arhenius temperature dependence of rheology");
+          // prm.declare_entry ("Grain size exponent", "0.73",
+          //                    Patterns::Double(),
+          //                    "exponent for grainsize dependence");
+          // prm.declare_entry ("Stress exponent", "3.5",
+          //                    Patterns::Double(),
+          //                    "stress exponent for non-linear rheology");
         }
         prm.leave_subsection();
       }

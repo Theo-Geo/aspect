@@ -70,6 +70,9 @@ namespace aspect
     class TosiMaterial : public MaterialModel::Interface<dim>, public ::aspect::SimulatorAccess<dim>
     {
       public:
+        void
+        initialize() override; 
+
         void evaluate(const MaterialModel::MaterialModelInputs<dim> &in,
                       MaterialModel::MaterialModelOutputs<dim> &out) const override
         {
@@ -83,20 +86,26 @@ namespace aspect
            * while the strain rate dependent nonlinear part is computed as:
            * $\eta_{plast}(\dot\epsilon) = \text{eta\_asterisk} + \frac{\text{sigma\_yield}}{\sqrt(\dot\epsilon:\dot\epsilon)}$
            */
-
+          
           //set up additional output for the derivatives
           const std::shared_ptr<MaterialModel::MaterialModelDerivatives<dim>> derivatives
             = out.template get_additional_output_object<MaterialModel::MaterialModelDerivatives<dim>>();
+          
+          base_model->evaluate(in, out); 
 
+          double av_cpo_viscosity = 1.0; 
+          
           for (unsigned int i=0; i < in.n_evaluation_points(); ++i)
             {
               if (in.requests_property(MaterialModel::MaterialProperties::viscosity))
                 {
+                  av_cpo_viscosity = out.viscosities[i];
                   out.viscosities[i] = viscosity (in.temperature[i],
                                                   in.pressure[i],
                                                   in.composition[i],
                                                   in.strain_rate[i],
-                                                  in.position[i]);
+                                                  in.position[i], 
+                                                  av_cpo_viscosity);
                 }
 
               out.densities[i] = reference_rho * (1.0 - thermal_alpha * (in.temperature[i] - reference_T));
@@ -145,7 +154,7 @@ namespace aspect
                       // derivative in xx direction
                       SymmetricTensor<2,dim> dstrain_rate = in.strain_rate[i];
                       dstrain_rate[0][0] += std::fabs(in.strain_rate[i][0][0]) * finite_difference_accuracy;
-                      const double eta_zero_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i]);
+                      const double eta_zero_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], av_cpo_viscosity);
                       deta[0][0] = eta_zero_zero - out.viscosities[i];
 
                       if (dstrain_rate[0][0] != 0)
@@ -159,7 +168,7 @@ namespace aspect
                       // is modified by 0.5 in xy and yx direction simultaneously and we compute the combined
                       // derivative
                       dstrain_rate[1][0] += 0.5 * std::fabs(in.strain_rate[i][1][0]) * finite_difference_accuracy;
-                      const double eta_one_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i]);
+                      const double eta_one_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], av_cpo_viscosity);
                       deta[1][0] = eta_one_zero - out.viscosities[i];
 
                       if (dstrain_rate[1][0] != 0)
@@ -170,7 +179,7 @@ namespace aspect
                       // derivative in yy direction
                       dstrain_rate = in.strain_rate[i];
                       dstrain_rate[1][1] += std::fabs(in.strain_rate[i][1][1]) * finite_difference_accuracy;
-                      const double eta_one_one = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i]);
+                      const double eta_one_one = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], av_cpo_viscosity);
                       deta[1][1] = eta_one_one - out.viscosities[i];
 
                       if (dstrain_rate[1][1] != 0)
@@ -185,9 +194,6 @@ namespace aspect
             }
 
         }
-
-
-
 
         /**
          * @name Qualitative properties one can ask a material model
@@ -204,9 +210,7 @@ namespace aspect
          * (incompressible Stokes).
          */
         bool is_compressible () const override;
-        /**
-         * @}
-         */
+
         /**
          * Declare the parameters this class takes through input files.
          */
@@ -220,13 +224,18 @@ namespace aspect
         void
         parse_parameters (ParameterHandler &prm) override;
 
+        void
+        create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const override;
+
+
       private:
 
         double viscosity (const double                  temperature,
                           const double                  pressure,
                           const std::vector<double>    &compositional_fields,
                           const SymmetricTensor<2,dim> &strain_rate,
-                          const Point<dim>             &position) const;
+                          const Point<dim>             &position,
+                          const double                  aniso_viscosity) const;
 
         /*
          * Function to compute the linear viscosity
@@ -243,7 +252,9 @@ namespace aspect
          */
         double viscoplast(const double eta_asterisk,
                           const double stress_y,
-                          const double strain_rate_norm) const;
+                          const double aniso_viscosity,
+                          const double strainratenorm
+                          ) const;
 
         /**
          * The density at reference temperature
@@ -315,6 +326,13 @@ namespace aspect
          */
         bool use_analytical_derivative;
 
+        /**
+         * Pointer to the material model used as the base model
+         */
+        std::unique_ptr<MaterialModel::Interface<dim>> base_model;
+
+        // MaterialModel::MaterialModelOutputs<dim> &outbase; 
+
     };
 
     /*
@@ -328,7 +346,8 @@ namespace aspect
                const double,
                const std::vector<double> &,
                const SymmetricTensor<2,dim> &strain_rate,
-               const Point<dim> &) const
+               const Point<dim> &,
+               const double aniso_viscosity) const
     {
 
       // In the first nonlinear iteration of the (pre-refinement steps of the) first time step,
@@ -348,7 +367,7 @@ namespace aspect
         }
       else
         {
-          const double visc_plastic = viscoplast(eta_asterisk,sigma_yield,strain_rate.norm());
+          const double visc_plastic = viscoplast(eta_asterisk,sigma_yield, aniso_viscosity, strain_rate.norm());
 
           // Compute the harmonic average (equation (6) of the paper)
           viscosity = 2.0 / ((1.0 / visc_linear) + (1.0 / visc_plastic));
@@ -385,19 +404,40 @@ namespace aspect
     TosiMaterial<dim>::
     viscoplast(const double etaasterisk,
                const double stressy,
+               const double aniso_viscosity, 
                const double strainratenorm) const
     {
-      return etaasterisk + (stressy/strainratenorm);
+      return etaasterisk + (stressy/strainratenorm); //aniso_viscosity
     }
 
+    /**
+     * Functions relevant for properties 
+     * additional outputs, base model 
+     */
 
-
+    template <int dim>
+    void
+    TosiMaterial<dim>::initialize()
+    {
+      base_model->initialize();
+    }
+    
     template <int dim>
     bool
     TosiMaterial<dim>::
     is_compressible () const
     {
+      AssertThrow(!(base_model->is_compressible()), 
+        ExcMessage("You may not use a compressible material model"
+                  " as the base model for the Tosi benchmark."));
       return false;
+    }
+
+    template <int dim>
+    void
+    TosiMaterial<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
+    {
+      base_model->create_additional_named_outputs(out);
     }
 
     template <int dim>
@@ -453,6 +493,9 @@ namespace aspect
           prm.declare_entry ("Use analytical derivative", "false",
                              Patterns::Bool (),
                              "Whether to use the analytical or the finite difference derivative for the Newton method.");
+          prm.declare_entry("Base model","simple",
+                            Patterns::Selection(MaterialModel::get_valid_model_names_pattern<dim>()),
+                            "Name of the material model from which the evaluate function is called.");
         }
         prm.leave_subsection();
       }
@@ -482,6 +525,17 @@ namespace aspect
           eta_initial                = prm.get_double ("Initial viscosity");
           use_analytical_derivative  = prm.get_bool ("Use analytical derivative");
 
+          AssertThrow( prm.get("Base model") != "Tosi benchmark",
+                       ExcMessage("You may not use 'Tosi benchmark' as the base model for "
+                                  "the Tosi benchmark.") );
+
+          // create the base model and initialize its SimulatorAccess base
+          // class; it will get a chance to read its parameters below after we
+          // leave the current section
+          base_model = MaterialModel::create_material_model<dim>(prm.get("Base model"));
+          if (SimulatorAccess<dim> *sim = dynamic_cast<SimulatorAccess<dim>*>(base_model.get()))
+            sim->initialize_simulator (this->get_simulator());
+
         }
         prm.leave_subsection();
       }
@@ -493,6 +547,13 @@ namespace aspect
       this->model_dependence.compressibility = MaterialModel::NonlinearDependence::none;
       this->model_dependence.specific_heat = MaterialModel::NonlinearDependence::none;
       this->model_dependence.thermal_conductivity = MaterialModel::NonlinearDependence::none;
+
+      /**
+      * base model syntax -> get model dependencies
+      */
+      base_model->parse_parameters(prm);
+      this->model_dependence = base_model->get_model_dependence();
+
     }
 
 
