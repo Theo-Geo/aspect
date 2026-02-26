@@ -1,15 +1,16 @@
-# A description of viscoplastic convection in a 2d box as
+# A description of viscoplastic convection in a *2.5d* box as
 # described in Tosi et al. (2015).
 # Tosi, N., et al. (2015),
 # A community benchmark for viscoplastic thermal
-# convection in a 2-D square box,
+# convection in a *2.5*-D square box,
 # Geochem. Geophys. Geosyst., 16, 2175–2196,
 # doi:10.1002/2015GC005807.
+# should recover the results for the 2d case
 
 # We add the necessary plugins through a shared library
 set Additional shared libraries            = ./libtosi_benchmark.so
 
-set Output directory                       = output-Case1_3d
+set Output directory                       = output-Case1_4_3d
 
 # This is a 2D benchmark.
 set Dimension                              = 3
@@ -19,10 +20,10 @@ set Dimension                              = 3
 # the iterated Advection and Stokes nonlinear solver with 200 cheap
 # Stokes solves.
 set Use years instead of seconds           = false
-set End time                               = 1
+set End time                               = 0.5
 set Nonlinear solver scheme                = iterated Advection and Stokes
 set Max nonlinear iterations               = 200
-set Nonlinear solver tolerance             = 1e-7
+set Nonlinear solver tolerance             = 1e-5
 
 # We choose a zero average pressure
 # at the surface of the domain (for the current geometry, the
@@ -33,7 +34,7 @@ set Surface pressure                       = 0
 subsection Solver parameters
   subsection Stokes solver parameters
     set Number of cheap Stokes solver steps    = 200
-    set Linear solver tolerance                = 1e-7
+    set Linear solver tolerance                = 1e-5
   end
 end
 
@@ -169,21 +170,21 @@ end
 # Tosi et al. (2015) also report depth averages; averages for viscosity
 # and temperature are produced every 0.05 units of time.
 subsection Postprocess
-  set List of postprocessors = velocity statistics, temperature statistics, heat flux statistics, \
-                               visualization, TosiPostprocessor, depth average, velocity boundary statistics
+   set List of postprocessors = visualization, velocity statistics, temperature statistics 
+   # heat flux statistics, TosiPostprocessor, depth average, velocity boundary statistics
 
-  subsection Depth average
-    set List of output variables = temperature, viscosity
-    set Time between graphical output = 0.05
-    set Number of zones = 10
-  end
+  # subsection Depth average
+  #   set List of output variables = temperature, viscosity
+  #   set Time between graphical output = 0.05
+  #   set Number of zones = 10
+  # end
 
   subsection Visualization
-    set List of output variables = material properties, strain rate, gravity, heating
+    set List of output variables = material properties, strain rate
     set Time between graphical output = 0.05
 
     subsection Material properties
-      set List of material properties = viscosity, density, specific heat, thermal expansivity
+      set List of material properties = viscosity, density
     end
   end
 end

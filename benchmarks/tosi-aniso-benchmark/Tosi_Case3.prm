@@ -1,4 +1,4 @@
-include Tosi_base.prm
+include ../Tosi_base.prm
 
 set Additional shared libraries            = ./libtosi-aniso.so
 set Output directory                       = Case3_4

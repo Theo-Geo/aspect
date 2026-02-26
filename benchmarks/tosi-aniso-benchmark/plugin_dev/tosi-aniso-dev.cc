@@ -16,9 +16,6 @@
   You should have received a copy of the GNU General Public License
   along with ASPECT; see the file doc/COPYING.  If not see
   <http://www.gnu.org/licenses/>.
-
-  #include "../../../cookbooks/CPO_induced_anisotropic_viscosity/plugin/cpo_induced_anisotropic_viscosity.cc"
-
  */
 
 #include <aspect/geometry_model/interface.h>
@@ -93,19 +90,20 @@ namespace aspect
           
           base_model->evaluate(in, out); 
 
-          double av_cpo_viscosity = 1.0; 
+          const std::vector<double> scalar_viscosity_vector = out.viscosities;
+
+          // double av_cpo_viscosity = 1.0; 
           
           for (unsigned int i=0; i < in.n_evaluation_points(); ++i)
             {
               if (in.requests_property(MaterialModel::MaterialProperties::viscosity))
                 {
-                  av_cpo_viscosity = out.viscosities[i];
                   out.viscosities[i] = viscosity (in.temperature[i],
                                                   in.pressure[i],
                                                   in.composition[i],
                                                   in.strain_rate[i],
                                                   in.position[i], 
-                                                  av_cpo_viscosity);
+                                                  scalar_viscosity_vector[i]);
                 }
 
               out.densities[i] = reference_rho * (1.0 - thermal_alpha * (in.temperature[i] - reference_T));
@@ -154,7 +152,7 @@ namespace aspect
                       // derivative in xx direction
                       SymmetricTensor<2,dim> dstrain_rate = in.strain_rate[i];
                       dstrain_rate[0][0] += std::fabs(in.strain_rate[i][0][0]) * finite_difference_accuracy;
-                      const double eta_zero_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], av_cpo_viscosity);
+                      const double eta_zero_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], scalar_viscosity_vector[i]);
                       deta[0][0] = eta_zero_zero - out.viscosities[i];
 
                       if (dstrain_rate[0][0] != 0)
@@ -168,7 +166,7 @@ namespace aspect
                       // is modified by 0.5 in xy and yx direction simultaneously and we compute the combined
                       // derivative
                       dstrain_rate[1][0] += 0.5 * std::fabs(in.strain_rate[i][1][0]) * finite_difference_accuracy;
-                      const double eta_one_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], av_cpo_viscosity);
+                      const double eta_one_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], scalar_viscosity_vector[i]);
                       deta[1][0] = eta_one_zero - out.viscosities[i];
 
                       if (dstrain_rate[1][0] != 0)
@@ -179,7 +177,7 @@ namespace aspect
                       // derivative in yy direction
                       dstrain_rate = in.strain_rate[i];
                       dstrain_rate[1][1] += std::fabs(in.strain_rate[i][1][1]) * finite_difference_accuracy;
-                      const double eta_one_one = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], av_cpo_viscosity);
+                      const double eta_one_one = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], scalar_viscosity_vector[i]);
                       deta[1][1] = eta_one_one - out.viscosities[i];
 
                       if (dstrain_rate[1][1] != 0)
@@ -252,7 +250,9 @@ namespace aspect
          */
         double viscoplast(const double eta_asterisk,
                           const double stress_y,
-                          const double aniso_viscosity,
+                          const double n, 
+                          const double A, 
+                          const double aniso_visc,
                           const double strainratenorm
                           ) const;
 
@@ -304,6 +304,18 @@ namespace aspect
          * plastic viscosity formula
          */
         double sigma_yield;
+
+        
+        /*
+         * non-linear stress exponent 
+         * used in the viscous limit
+         */
+        double power_law_exponent;
+
+        /*
+         * Rate factor used for the non-linear viscosity
+         */
+        double rate_factor;
 
         /*
          * The lower viscosity cut-off value
@@ -367,7 +379,7 @@ namespace aspect
         }
       else
         {
-          const double visc_plastic = viscoplast(eta_asterisk,sigma_yield, aniso_viscosity, strain_rate.norm());
+          const double visc_plastic = viscoplast(eta_asterisk, sigma_yield, power_law_exponent, rate_factor, aniso_viscosity, strain_rate.norm());
 
           // Compute the harmonic average (equation (6) of the paper)
           viscosity = 2.0 / ((1.0 / visc_linear) + (1.0 / visc_plastic));
@@ -404,10 +416,15 @@ namespace aspect
     TosiMaterial<dim>::
     viscoplast(const double etaasterisk,
                const double stressy,
-               const double aniso_viscosity, 
+               const double n,
+               const double A,
+               const double aniso_visc, 
                const double strainratenorm) const
-    {
-      return etaasterisk + (stressy*aniso_viscosity); // /strainratenorm
+    { 
+
+      return etaasterisk + (stressy * std::pow(A, 0.0-1.0/n) * aniso_visc);
+      //  ) std::pow(strainratenorm, (1.0/n-1.0))
+      // return etaasterisk + (stressy*aniso_viscosity);
     }
 
     /**
@@ -496,6 +513,12 @@ namespace aspect
           prm.declare_entry("Base model","simple",
                             Patterns::Selection(MaterialModel::get_valid_model_names_pattern<dim>()),
                             "Name of the material model from which the evaluate function is called.");
+          prm.declare_entry("Power law exponent","1e3",
+                            Patterns::Double (0),
+                            "The value of the stress exponent in equ. (20) of Rathmann et. al 2024."); 
+          prm.declare_entry("Rate factor", "1",
+                            Patterns::Double (0),
+                            "The value of the rate factor in equ. (20) of Rathmann et. al 2024.");  
         }
         prm.leave_subsection();
       }
@@ -524,6 +547,8 @@ namespace aspect
           eta_maximum                = prm.get_double ("Maximum viscosity");
           eta_initial                = prm.get_double ("Initial viscosity");
           use_analytical_derivative  = prm.get_bool ("Use analytical derivative");
+          rate_factor                = prm.get_double ("Rate factor");
+          power_law_exponent         = prm.get_double ("Power law exponent");
 
           AssertThrow( prm.get("Base model") != "Tosi benchmark",
                        ExcMessage("You may not use ``Tosi benchmark'' as the base model for "

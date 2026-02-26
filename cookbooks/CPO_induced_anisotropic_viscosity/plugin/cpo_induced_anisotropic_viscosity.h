@@ -85,6 +85,10 @@ namespace aspect
         std::vector<double> CnI_F, CnI_G, CnI_H, CnI_L, CnI_M, CnI_N;
 
         double grain_size;
+        double stress_exponent; 
+        double activation_energy; 
+        double fluidity_constant; 
+        double grain_size_exponent; 
 
         EquationOfState::LinearizedIncompressible<dim> equation_of_state;
 

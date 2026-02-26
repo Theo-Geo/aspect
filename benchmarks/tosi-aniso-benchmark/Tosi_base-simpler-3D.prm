@@ -148,13 +148,13 @@ subsection Postprocess
                                visualization, TosiPostprocessor, depth average, velocity boundary statistics
 
   subsection Depth average
-    set List of output variables = temperature, viscosity
-    set Time between graphical output = 0.05
+    set List of output variables = temperature, viscosity,  velocity magnitude
+    set Time between graphical output = 0.2
     set Number of zones = 10
   end
 
   subsection Visualization
-    set List of output variables = material properties, strain rate, gravity, heating
+    set List of output variables = material properties, strain rate
     set Time between graphical output = 0.05
 
     subsection Material properties

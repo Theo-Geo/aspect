@@ -1,0 +1,55 @@
+include ../Tosi_base-CPO.prm
+
+set Additional shared libraries            = ./libtosi-aniso.so
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-Case2_4-viscoplastic-dev-CPO
+set Nonlinear solver tolerance             = 1e-3 # 8e-4
+set End time                = 0.2
+set Maximum first time step = 1e-5
+
+# set Maximum time step = 5e-5
+set Nonlinear solver scheme = single Advection, iterated Stokes
+set Max nonlinear iterations = 50
+set Nonlinear solver failure strategy = cut timestep size
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Stokes solver type = block AMG
+    set Number of cheap Stokes solver steps= 500
+    set Linear solver tolerance            = 1e-4 # 8e-4
+  end 
+  # subsection Diffusion solver parameters
+  #   set Diffusion length scale = 3.5e-2
+  # end
+end 
+
+subsection Discretization 
+  subsection Stabilization parameters
+    # set Use artificial viscosity smoothing = true
+  end
+end 
+
+subsection Mesh refinement
+  set Initial global refinement = 0 # 4
+end
+
+# Between the cases the "Pressure viscosity parameter" ($\Delta_{\eta}_z$),
+# the "Yield stress" ($\sigma_y$) and the "Nonlinear viscosity constant" ($\eta^*$)
+# are varied, see Eq. (6-8) and Table 1 of the paper.
+subsection Material model
+  subsection Tosi benchmark
+    set Pressure viscosity parameter  = 1
+    set Yield stress          = 1
+    set Nonlinear viscosity constant  = 1e-3
+    set Initial viscosity        = 0.115
+    # parameter value as in Rathmann et. al. 2024
+    set Rate factor = 100         # chosen to match plume passing lid timing
+    set Power law exponent = 3.5  # chosen as representative for disocation creep
+  end
+end
+
+subsection Postprocess 
+  subsection Visualization
+    set Time between graphical output = 0.002
+  end 
+end 
+

@@ -1,7 +1,16 @@
-include Tosi_base.prm
+include ../Tosi_base
 
 set Additional shared libraries            = ./libtosi-aniso.so
-set Output directory                       = Case2_4
+set Output directory                       = output-Case2_4
+set Nonlinear solver tolerance             = 1e-5
+
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Number of cheap Stokes solver steps= 200
+    set Linear solver tolerance            = 1e-5
+  end 
+end 
 
 # Between the cases the "Pressure viscosity parameter" ($\Delta_{\eta}_z$),
 # the "Yield stress" ($\sigma_y$) and the "Nonlinear viscosity constant" ($\eta^*$)

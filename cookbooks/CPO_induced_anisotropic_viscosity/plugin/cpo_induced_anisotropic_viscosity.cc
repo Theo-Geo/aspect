@@ -162,6 +162,8 @@ namespace aspect
       EquationOfStateOutputs<dim> eos_outputs (1);
       const unsigned int viscosity_field_index = this->introspection().compositional_index_for_name("scalar_viscosity");
 
+      const double n = stress_exponent; //1
+
       for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
         {
           equation_of_state.evaluate(in, q, eos_outputs);
@@ -187,13 +189,14 @@ namespace aspect
 
           // The computation of the viscosity tensor is only necessary after the simulator has been initialized
           // and when the condition allows dislocation creep
-          if  ((this->simulator_is_past_initialization()) && (this->get_timestep_number() > 0) && (in.temperature[q]>1000) && (std::isfinite(determinant(deviatoric_strain_rate))) && (anisotropic_viscosity != nullptr))
+          if  ((this->simulator_is_past_initialization()) && (this->get_timestep_number() > 0) && (std::isfinite(determinant(deviatoric_strain_rate))) && (anisotropic_viscosity != nullptr)) // && (in.temperature[q]>1000)
             {
               // Create constant value to use for AV
-              const double A_o = 1; // 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
-              const double n = 1; //3.5;
+
+              const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*std::max(in.temperature[q],1.0e-10)));
+              // 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
               // The values of A_o and 0.73 were picked so that Gamma = 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=1000 microns
-              const double Gamma = (A_o/(std::pow(grain_size,0.73)));
+              const double Gamma = (A_o/(std::pow(grain_size, grain_size_exponent)));
 
               // Get eigenvalues from compositional fields
               const std::vector<double> &composition = in.composition[q];
@@ -216,11 +219,11 @@ namespace aspect
 
               // Compute Hill Parameters FGHLMN from the eigenvalues of a,b,c axis
               // CPO2Hill v5 model:
-              const double F = Utilities::fixed_power<2>(eigvalue_a1)*CnI_F[0] + eigvalue_a2*CnI_F[1] + (1/eigvalue_a3)*CnI_F[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_F[3] + eigvalue_b2*CnI_F[4] + (1/eigvalue_b3)*CnI_F[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_F[6] + eigvalue_c2*CnI_F[7] + (1/eigvalue_c3)*CnI_F[8] + CnI_F[9];
-              const double G = Utilities::fixed_power<2>(eigvalue_a1)*CnI_G[0] + eigvalue_a2*CnI_G[1] + (1/eigvalue_a3)*CnI_G[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_G[3] + eigvalue_b2*CnI_G[4] + (1/eigvalue_b3)*CnI_G[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_G[6] + eigvalue_c2*CnI_G[7] + (1/eigvalue_c3)*CnI_G[8] + CnI_G[9];
-              const double H = Utilities::fixed_power<2>(eigvalue_a1)*CnI_H[0] + eigvalue_a2*CnI_H[1] + (1/eigvalue_a3)*CnI_H[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_H[3] + eigvalue_b2*CnI_H[4] + (1/eigvalue_b3)*CnI_H[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_H[6] + eigvalue_c2*CnI_H[7] + (1/eigvalue_c3)*CnI_H[8] + CnI_H[9];
-              const double L = std::abs(Utilities::fixed_power<2>(eigvalue_a1)*CnI_L[0] + eigvalue_a2*CnI_L[1] + (1/eigvalue_a3)*CnI_L[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_L[3] + eigvalue_b2*CnI_L[4] + (1/eigvalue_b3)*CnI_L[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_L[6] + eigvalue_c2*CnI_L[7] + (1/eigvalue_c3)*CnI_L[8] + CnI_L[9]);
-              const double M = std::abs(Utilities::fixed_power<2>(eigvalue_a1)*CnI_M[0] + eigvalue_a2*CnI_M[1] + (1/eigvalue_a3)*CnI_M[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_M[3] + eigvalue_b2*CnI_M[4] + (1/eigvalue_b3)*CnI_M[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_M[6] + eigvalue_c2*CnI_M[7] + (1/eigvalue_c3)*CnI_M[8] + CnI_M[9]);
+              const double F = Utilities::fixed_power<2>(eigvalue_a1)*CnI_F[0] + eigvalue_a2*CnI_F[1] + (1/eigvalue_a3)*CnI_F[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_F[3] + eigvalue_b2*CnI_F[4] + (1/eigvalue_b3)*CnI_F[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_F[6] + eigvalue_c2*CnI_F[7] + (1/eigvalue_c3)*CnI_F[8] + CnI_F[9]; //0.5
+              const double G = Utilities::fixed_power<2>(eigvalue_a1)*CnI_G[0] + eigvalue_a2*CnI_G[1] + (1/eigvalue_a3)*CnI_G[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_G[3] + eigvalue_b2*CnI_G[4] + (1/eigvalue_b3)*CnI_G[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_G[6] + eigvalue_c2*CnI_G[7] + (1/eigvalue_c3)*CnI_G[8] + CnI_G[9]; // 0.5;
+              const double H = Utilities::fixed_power<2>(eigvalue_a1)*CnI_H[0] + eigvalue_a2*CnI_H[1] + (1/eigvalue_a3)*CnI_H[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_H[3] + eigvalue_b2*CnI_H[4] + (1/eigvalue_b3)*CnI_H[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_H[6] + eigvalue_c2*CnI_H[7] + (1/eigvalue_c3)*CnI_H[8] + CnI_H[9]; 
+              const double L = std::abs(Utilities::fixed_power<2>(eigvalue_a1)*CnI_L[0] + eigvalue_a2*CnI_L[1] + (1/eigvalue_a3)*CnI_L[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_L[3] + eigvalue_b2*CnI_L[4] + (1/eigvalue_b3)*CnI_L[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_L[6] + eigvalue_c2*CnI_L[7] + (1/eigvalue_c3)*CnI_L[8] + CnI_L[9]); 
+              const double M = std::abs(Utilities::fixed_power<2>(eigvalue_a1)*CnI_M[0] + eigvalue_a2*CnI_M[1] + (1/eigvalue_a3)*CnI_M[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_M[3] + eigvalue_b2*CnI_M[4] + (1/eigvalue_b3)*CnI_M[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_M[6] + eigvalue_c2*CnI_M[7] + (1/eigvalue_c3)*CnI_M[8] + CnI_M[9]); // 
               const double N = std::abs(Utilities::fixed_power<2>(eigvalue_a1)*CnI_N[0] + eigvalue_a2*CnI_N[1] + (1/eigvalue_a3)*CnI_N[2] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_N[3] + eigvalue_b2*CnI_N[4] + (1/eigvalue_b3)*CnI_N[5] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_N[6] + eigvalue_c2*CnI_N[7] + (1/eigvalue_c3)*CnI_N[8] + CnI_N[9]);
 
               Tensor<2,6> R_CPO_K;
@@ -320,30 +323,31 @@ namespace aspect
               // Thus for the first timestep we calculate an initial viscosity based on the strain rate.
               if (this->get_timestep_number() == 1)
                 {
-                  const double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
+                  double edot_ii=std::max(std::max(strain_rate.norm(), 0.),
                                                 min_strain_rate);
-                  scalar_viscosity= 1/Gamma * std::pow(edot_ii,((1. - n)/n));
+                  scalar_viscosity= std::pow(edot_ii,((1. - n)/n)); // 1/Gamma *
+                  // std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)), min_strain_rate);
                 }
 
               unsigned int n_iterations = 0;
               const unsigned int max_iteration = 100;
               double residual = scalar_viscosity;
-              double threshold = 0.0001*scalar_viscosity;
+              double threshold = 0.00001*scalar_viscosity;
               // Here we convert stress to MPa to be consistent with the constitutive equation defined in Signorelli et al. (2021),
               // in which the stress is in MPa.
-              SymmetricTensor<2,dim> stress = 2 * scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6;
+              SymmetricTensor<2,dim> stress = scalar_viscosity * V_r4 * deviatoric_strain_rate; // 2 * / 1e6;
 
               const Tensor<2,dim> R_T = transpose(R);
               while (std::abs(residual) > threshold && n_iterations < max_iteration)
                 {
-                  stress = (1./2.) * (stress + 2*scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6);
+                  stress = (1./2.) * (stress + scalar_viscosity * V_r4 * deviatoric_strain_rate); // 2* / 1e6);
 
                   const Tensor<2,dim> S_CPO= R_T * stress * R;
 
-                  double Jhill = F*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[1][1]) + G*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[2][2]) + H*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[0][0]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]);
+                  double Jhill = 2.0/3.0*(F*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[1][1]) + G*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[2][2]) + H*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[0][0]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]));
                   if (Jhill < 0)
                     {
-                      Jhill = std::abs(F)*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[1][1]) + std::abs(G)*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[2][2]) + std::abs(H)*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[0][0]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]);
+                      Jhill = 2.0/3.0*(std::abs(F)*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[1][1]) + std::abs(G)*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[2][2]) + std::abs(H)*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[0][0]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]));
                     }
 
                   AssertThrow(std::isfinite(Jhill),
@@ -354,11 +358,15 @@ namespace aspect
                   const double scalar_viscosity_new = (1 / (Gamma * std::pow(Jhill,(n-1)/2)));
                   residual = std::abs(scalar_viscosity_new - scalar_viscosity);
                   scalar_viscosity = scalar_viscosity_new;
-                  threshold = 0.001*scalar_viscosity;
+                  threshold = 0.00001*scalar_viscosity;
                   n_iterations++;
 
                 }
               // Store the scalar viscosity in out.viscosities
+              // double edot_norm=std::max(std::max(strain_rate.norm(), 0.),
+              //                                   min_strain_rate);
+              // double visc_proof = std::pow(edot_norm,((1. - n)/n));
+
               out.viscosities[q] = scalar_viscosity;
 
               AssertThrow(std::isfinite(out.viscosities[q]),
@@ -369,6 +377,15 @@ namespace aspect
             }
           else // timestep == 0 or no anisotropic viscosity
             {
+              if ((this->simulator_is_past_initialization()) && (std::isfinite(determinant(deviatoric_strain_rate))))
+                {
+                  // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
+                  double edot_ii=std::max(std::max(strain_rate.norm(), 0.),
+                                                min_strain_rate);
+                  out.viscosities[q] = std::pow(edot_ii,((1. - n)/n)); // 1/Gamma *
+
+                }
+
               if (anisotropic_viscosity != nullptr)
                 {
                   // Assign an isotropic viscosity tensor
@@ -459,21 +476,21 @@ namespace aspect
                              "Magnitude of reference viscosity.");
           prm.declare_entry ("Minimum strain rate", "1.4e-20", Patterns::Double(),
                              "Stabilizes strain dependent viscosity. Units: \\si{\\per\\second}");
-          prm.declare_entry ("Grain size", "1e-3",
+          prm.declare_entry ("Grain size", "1.0e-3",
                              Patterns::Double(),
                              "Olivine anisotropic viscosity is dependent of grain size. Value is given in meters");
-          // prm.declare_entry ("Fluidity constant", "1.1e5",
-          //                    Patterns::Double(),
-          //                    "");
-          // prm.declare_entry ("Activation energy", "530000",
-          //                    Patterns::Double(),
-          //                    "Activation energy for arhenius temperature dependence of rheology");
-          // prm.declare_entry ("Grain size exponent", "0.73",
-          //                    Patterns::Double(),
-          //                    "exponent for grainsize dependence");
-          // prm.declare_entry ("Stress exponent", "3.5",
-          //                    Patterns::Double(),
-          //                    "stress exponent for non-linear rheology");
+          prm.declare_entry ("Fluidity constant", "1.1e5",
+                             Patterns::Double(),
+                             "Prefactor for Arhenius temperature activation");
+          prm.declare_entry ("Activation energy", "530000.0",
+                             Patterns::Double(),
+                             "Activation energy for Arhenius temperature dependence of rheology");
+          prm.declare_entry ("Grain size exponent", "0.73",
+                             Patterns::Double(),
+                             "exponent for grainsize dependence");
+          prm.declare_entry ("Stress exponent", "3.5",
+                             Patterns::Double(),
+                             "stress exponent for non-linear rheology");
         }
         prm.leave_subsection();
       }
@@ -495,6 +512,10 @@ namespace aspect
           eta = prm.get_double("Reference viscosity");
           min_strain_rate = prm.get_double("Minimum strain rate");
           grain_size = prm.get_double("Grain size");
+          stress_exponent = prm.get_double("Stress exponent");
+          fluidity_constant = prm.get_double("Fluidity constant");
+          grain_size_exponent = prm.get_double("Grain size exponent");
+          activation_energy = prm.get_double("Activation energy");
           CnI_F = dealii::Utilities::string_to_double(dealii::Utilities::split_string_list(prm.get("Coefficients and intercept for F")));
           CnI_G = dealii::Utilities::string_to_double(dealii::Utilities::split_string_list(prm.get("Coefficients and intercept for G")));
           CnI_H = dealii::Utilities::string_to_double(dealii::Utilities::split_string_list(prm.get("Coefficients and intercept for H")));
