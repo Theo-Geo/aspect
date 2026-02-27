@@ -1,8 +1,8 @@
 include ../Tosi_base-CPO.prm
 
 set Additional shared libraries            = ./libtosi-aniso.so
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-Case2_4-viscoplastic-dev-CPO
-set Nonlinear solver tolerance             = 1e-3 # 8e-4
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-viscoplastic-v3-ave-CPO
+set Nonlinear solver tolerance             = 1e-4 # 8e-4
 set End time                = 0.2
 set Maximum first time step = 1e-5
 
@@ -15,7 +15,7 @@ subsection Solver parameters
   subsection Stokes solver parameters
     set Stokes solver type = block AMG
     set Number of cheap Stokes solver steps= 500
-    set Linear solver tolerance            = 1e-4 # 8e-4
+    set Linear solver tolerance            = 1e-5 # 8e-4
   end 
   # subsection Diffusion solver parameters
   #   set Diffusion length scale = 3.5e-2
@@ -51,5 +51,8 @@ subsection Postprocess
   subsection Visualization
     set Time between graphical output = 0.002
   end 
+  subsection Crystal Preferred Orientation
+    set Time between data output = 0.01
+  end
 end 
 

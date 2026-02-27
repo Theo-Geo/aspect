@@ -159,6 +159,7 @@ namespace aspect
       const int dim=3;
       const std::shared_ptr<MaterialModel::AnisotropicViscosity<dim>> anisotropic_viscosity =
         out.template get_additional_output_object<MaterialModel::AnisotropicViscosity<dim>>();
+      
       EquationOfStateOutputs<dim> eos_outputs (1);
       const unsigned int viscosity_field_index = this->introspection().compositional_index_for_name("scalar_viscosity");
 
@@ -218,7 +219,7 @@ namespace aspect
               const Tensor<2,3> R = euler_angles_to_rotation_matrix(phi1, theta, phi2);
 
               // Compute Hill Parameters FGHLMN from the eigenvalues of a,b,c axis
-               // CPO2Hill v3 model:
+              // CPO2Hill v3 model:
               const double F = Utilities::fixed_power<2>(eigvalue_a1)*CnI_F[0] + eigvalue_a1*CnI_F[1] + eigvalue_a2*CnI_F[2] + (1/eigvalue_a3)*CnI_F[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_F[4] + eigvalue_b1*CnI_F[5] + eigvalue_b2*CnI_F[6] + (1/eigvalue_b3)*CnI_F[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_F[8] + eigvalue_c1*CnI_F[9] + eigvalue_c2*CnI_F[10] + (1/eigvalue_c3)*CnI_F[11] + CnI_F[12];
               const double G = Utilities::fixed_power<2>(eigvalue_a1)*CnI_G[0] + eigvalue_a1*CnI_G[1] + eigvalue_a2*CnI_G[2] + (1/eigvalue_a3)*CnI_G[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_G[4] + eigvalue_b1*CnI_G[5] + eigvalue_b2*CnI_G[6] + (1/eigvalue_b3)*CnI_G[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_G[8] + eigvalue_c1*CnI_G[9] + eigvalue_c2*CnI_G[10] + (1/eigvalue_c3)*CnI_G[11] + CnI_G[12];
               const double H = Utilities::fixed_power<2>(eigvalue_a1)*CnI_H[0] + eigvalue_a1*CnI_H[1] + eigvalue_a2*CnI_H[2] + (1/eigvalue_a3)*CnI_H[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_H[4] + eigvalue_b1*CnI_H[5] + eigvalue_b2*CnI_H[6] + (1/eigvalue_b3)*CnI_H[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_H[8] + eigvalue_c1*CnI_H[9] + eigvalue_c2*CnI_H[10] + (1/eigvalue_c3)*CnI_H[11] + CnI_H[12];
@@ -270,15 +271,15 @@ namespace aspect
               R_CPO_K[5][5] = R[0][0]*R[1][1]+R[0][1]*R[1][0];
 
               SymmetricTensor<2,6> A;
-              A[0][0] = (G+H);
-              A[0][1] = (-H);
-              A[0][2] = (-G);
-              A[1][1] = (H+F);
-              A[1][2] = (-F);
-              A[2][2] = (F+G);
-              A[3][3] = (L);
-              A[4][4] = (M);
-              A[5][5] = (N);
+              A[0][0] = (2./3.) * (G+H);
+              A[0][1] = (2./3.) * (-H);
+              A[0][2] = (2./3.) * (-G);
+              A[1][1] = (2./3.) * (H+F);
+              A[1][2] = (2./3.) * (-F);
+              A[2][2] = (2./3.) * (F+G);
+              A[3][3] = (2./3.) * (L);
+              A[4][4] = (2./3.) * (M);
+              A[5][5] = (2./3.) * (N);
 
               // A is the anisotropic tensor for the fluidity. We need its inverse, but it's not invertible due to singularity.
               // Thus we compute the Moore-Penrose pseudo inverse using SVD
@@ -332,7 +333,7 @@ namespace aspect
               unsigned int n_iterations = 0;
               const unsigned int max_iteration = 100;
               double residual = scalar_viscosity;
-              double threshold = 0.00001*scalar_viscosity;
+              double threshold = 0.0001*scalar_viscosity;
               // Here we convert stress to MPa to be consistent with the constitutive equation defined in Signorelli et al. (2021),
               // in which the stress is in MPa.
               SymmetricTensor<2,dim> stress = scalar_viscosity * V_r4 * deviatoric_strain_rate; // 2 * / 1e6;
@@ -354,10 +355,10 @@ namespace aspect
                   AssertThrow(Jhill >= 0,
                               ExcMessage("Jhill should not be negative"));
 
-                  const double scalar_viscosity_new = (1 / ((2./3.) * Gamma * std::pow(Jhill,(n-1)/2)));
+                  const double scalar_viscosity_new = (1 / (Gamma * std::pow(Jhill,(n-1)/2)));
                   residual = std::abs(scalar_viscosity_new - scalar_viscosity);
                   scalar_viscosity = scalar_viscosity_new;
-                  threshold = 0.00001*scalar_viscosity;
+                  threshold = 0.0001*scalar_viscosity;
                   n_iterations++;
 
                 }
@@ -389,11 +390,11 @@ namespace aspect
                 {
                   // Assign an isotropic viscosity tensor
                   SymmetricTensor<2,6> V;
-                  V[0][0] = 4.0/9.0;
-                  V[0][1] = -2.0/9.0;
-                  V[0][2] = -2.0/9.0;
-                  V[1][1] = 4.0/9.0;
-                  V[1][2] = -2.0/9.0;
+                  V[0][0] = 2.0/3.0;  // 4.0/9.0;
+                  V[0][1] = -1.0/3.0; // -2.0/9.0;
+                  V[0][2] = -1.0/3; // -2.0/9.0;
+                  V[1][1] = 2.0/3.0;  // 4.0/9.0;
+                  V[1][2] = -1.0/3.0; // -2.0/9.0;
                   V[2][2] = 2.0/3.0;
                   V[3][3] = 2.0/3.0;
                   V[4][4] = 2.0/3.0;

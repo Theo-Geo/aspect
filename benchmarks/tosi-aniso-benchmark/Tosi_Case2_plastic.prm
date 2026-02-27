@@ -1,7 +1,7 @@
 include ../Tosi_base-iso-CPO.prm
 
 set Additional shared libraries            = ./libtosi-aniso.so
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-Case2_4-plastic-ideal-CPO
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-Case2_4-plastic-v3-CPO
 set Maximum first time step = 1e-4
 set Nonlinear solver scheme =  single Advection, iterated Stokes
 set Nonlinear solver tolerance             = 1e-5
@@ -32,11 +32,22 @@ subsection Material model
     set Initial viscosity        = 0.115
     set Rate factor = 1 # default
     set Power law exponent = 1e5 # default represents n \to \infty
+
+    set Base model               = CPO-induced anisotropic viscosity
+  end 
+
+  subsection CPO-induced Anisotropic Viscosity 
+    set Reference viscosity = 0.1
+    set Grain size = 1
+    set Activation energy = 0
+    set Fluidity constant = 1
+    set Grain size exponent = 0
+    set Stress exponent = 3.5
   end
 end
 
 subsection Postprocess
   subsection Visualization
-    set Time between graphical output = 0.004
+    set Time between graphical output = 0.002
   end
 end 
