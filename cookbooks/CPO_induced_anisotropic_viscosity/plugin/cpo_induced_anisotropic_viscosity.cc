@@ -324,9 +324,9 @@ namespace aspect
               // Thus for the first timestep we calculate an initial viscosity based on the strain rate.
               if (this->get_timestep_number() == 1)
                 {
-                  double edot_ii=std::max(std::max(strain_rate.norm(), 0.),
+                  double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
                                                 min_strain_rate);
-                  scalar_viscosity= std::pow(edot_ii,((1. - n)/n)); // 1/Gamma *
+                  scalar_viscosity= 1/Gamma*std::pow(edot_ii,((1. - n)/n));
                   // std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)), min_strain_rate);
                 }
 
@@ -344,10 +344,10 @@ namespace aspect
 
                   const Tensor<2,dim> S_CPO= R * stress * transpose(R);
 
-                  double Jhill = 2.0/3.0*(F*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[1][1]) + G*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[2][2]) + H*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[0][0]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]));
+                  double Jhill = 2.0/3.0*(F*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[1][1]) + G*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[2][2]) + H*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[0][0]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]));
                   if (Jhill < 0)
                     {
-                      Jhill = 2.0/3.0*(std::abs(F)*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[1][1]) + std::abs(G)*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[2][2]) + std::abs(H)*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[0][0]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]));
+                      Jhill = 2.0/3.0*(std::abs(F)*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[1][1]) + std::abs(G)*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[2][2]) + std::abs(H)*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[0][0]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]));
                     }
 
                   AssertThrow(std::isfinite(Jhill),
@@ -380,9 +380,9 @@ namespace aspect
               if ((this->simulator_is_past_initialization()) && (std::isfinite(determinant(deviatoric_strain_rate))))
                 {
                   // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
-                  double edot_ii=std::max(std::max(strain_rate.norm(), 0.),
+                  double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
                                                 min_strain_rate);
-                  out.viscosities[q] = std::pow(edot_ii,((1. - n)/n)); // 1/Gamma *
+                  out.viscosities[q] = 1/Gamma*std::pow(edot_ii,((1. - n)/n)); // 
 
                 }
 
@@ -487,10 +487,10 @@ namespace aspect
                              "Activation energy for Arhenius temperature dependence of rheology");
           prm.declare_entry ("Grain size exponent", "0.73",
                              Patterns::Double(),
-                             "exponent for grainsize dependence");
+                             "Exponent for grainsize dependence");
           prm.declare_entry ("Stress exponent", "3.5",
                              Patterns::Double(),
-                             "stress exponent for non-linear rheology");
+                             "Stress exponent for non-linear rheology");
         }
         prm.leave_subsection();
       }
