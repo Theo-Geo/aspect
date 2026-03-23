@@ -188,17 +188,17 @@ namespace aspect
                :
                strain_rate);
 
+          // Create constant value to use for AV
+
+          const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*std::max(in.temperature[q],1.0e-10)));
+          // 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
+          // The values of A_o and 0.73 were picked so that Gamma = 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=1000 microns
+          const double Gamma = (A_o/(std::pow(grain_size, grain_size_exponent)));
+
           // The computation of the viscosity tensor is only necessary after the simulator has been initialized
           // and when the condition allows dislocation creep
           if  ((this->simulator_is_past_initialization()) && (this->get_timestep_number() > 0) && (std::isfinite(determinant(deviatoric_strain_rate))) && (anisotropic_viscosity != nullptr)) // && (in.temperature[q]>1000)
             {
-              // Create constant value to use for AV
-
-              const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*std::max(in.temperature[q],1.0e-10)));
-              // 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
-              // The values of A_o and 0.73 were picked so that Gamma = 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=1000 microns
-              const double Gamma = (A_o/(std::pow(grain_size, grain_size_exponent)));
-
               // Get eigenvalues from compositional fields
               const std::vector<double> &composition = in.composition[q];
               const double eigvalue_a1 = composition[cpo_bingham_avg_a[1]];
