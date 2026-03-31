@@ -57,12 +57,9 @@
 
 #include <catch.hpp>
 
-#ifdef ASPECT_WITH_PYTHON
-#  define PY_SSIZE_T_CLEAN
-#  include <Python.h>
-#  define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#  include <numpy/arrayobject.h>
-#endif
+
+#define ASPECT_NUMPY_DEFINE_API
+#include <aspect/python_helper.h>
 
 namespace
 {
@@ -776,9 +773,12 @@ int main (int argc, char *argv[])
 
 #ifdef ASPECT_WITH_PYTHON
   Py_Initialize();
-  // required for Numpy interop
+  // Required for Numpy interop:
   if (_import_array() < 0)
-    AssertThrow(false, ExcMessage("Numpy init failed!"));
+    {
+      PyErr_Print();
+      AssertThrow(false, ExcMessage("Numpy init failed!"));
+    }
 
   ScopeExit python_cleanup(
     []()

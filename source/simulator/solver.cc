@@ -270,6 +270,7 @@ namespace aspect
             system_matrix.block(1,0).vmult(ptmp,wtmp);
 
             dst=0;
+            solver_control.set_tolerance(1e-6*ptmp.l2_norm());
             solver.solve(pressure_laplace_matrix,
                          dst,
                          ptmp,
@@ -399,11 +400,11 @@ namespace aspect
   {
     const unsigned int block_idx = advection_field.block_index(introspection);
 
-    std::string field_name = (advection_field.is_temperature()
-                              ?
-                              "temperature"
-                              :
-                              introspection.name_for_compositional_index(advection_field.compositional_variable) + " composition");
+    const std::string field_name = (advection_field.is_temperature()
+                                    ?
+                                    "temperature"
+                                    :
+                                    introspection.name_for_compositional_index(advection_field.compositional_variable) + " composition");
 
     const double advection_solver_tolerance = (advection_field.is_temperature()) ? (parameters.temperature_solver_tolerance) : (parameters.composition_solver_tolerance);
 
@@ -460,7 +461,7 @@ namespace aspect
       }
 
     // Create distributed vector (we need all blocks here even though we only
-    // solve for the current block) because only have a AffineConstraints<double>
+    // solve for the current block) because we only have an AffineConstraints object
     // for the whole system, current_linearization_point contains our initial guess.
     LinearAlgebra::BlockVector distributed_solution (
       introspection.index_sets.system_partitioning,

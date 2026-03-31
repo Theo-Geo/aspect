@@ -703,6 +703,7 @@ namespace aspect
        * <code>source/simulator/solver_schemes.cc</code>.
        */
       std::vector<double> assemble_and_solve_composition (const std::vector<double> &initial_residual = {},
+                                                          const unsigned int nonlinear_iteration = 0,
                                                           std::vector<double> *residual = nullptr);
 
       /**
@@ -1359,7 +1360,7 @@ namespace aspect
        */
       double perform_line_search(const DefectCorrectionResiduals &dcr,
                                  const bool use_picard,
-                                 LinearAlgebra::BlockVector &search_direction);
+                                 const LinearAlgebra::BlockVector &search_direction);
 
       /**
        * Add constraints to the given @p constraints object that are required

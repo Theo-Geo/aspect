@@ -198,8 +198,8 @@ namespace aspect
         }
 
       const double strain_rate_dependence = (1.0 - dislocation_creep_exponent[phase_index]) / dislocation_creep_exponent[phase_index];
-      const SymmetricTensor<2,dim> shear_strain_rate = strain_rate - 1./dim * trace(strain_rate) * unit_symmetric_tensor<dim>();
-      const double second_strain_rate_invariant = std::sqrt(std::max(-second_invariant(shear_strain_rate), 0.));
+      const SymmetricTensor<2,dim> shear_strain_rate = Utilities::Tensors::consistent_deviator(strain_rate);
+      const double second_strain_rate_invariant = std::sqrt(std::max(-Utilities::Tensors::consistent_second_invariant_of_deviatoric_tensor(shear_strain_rate), 0.));
 
       // If the strain rate is zero, the dislocation viscosity is infinity.
       if (second_strain_rate_invariant <= std::numeric_limits<double>::min())
@@ -221,7 +221,7 @@ namespace aspect
         {
           const SymmetricTensor<2,dim> dislocation_strain_rate = diffusion_viscosity
                                                                  / (diffusion_viscosity + dis_viscosity) * shear_strain_rate;
-          const double dislocation_strain_rate_invariant = std::sqrt(std::max(-second_invariant(dislocation_strain_rate), 0.));
+          const double dislocation_strain_rate_invariant = std::sqrt(std::max(-Utilities::Tensors::consistent_second_invariant_of_deviatoric_tensor(dislocation_strain_rate), 0.));
 
           dis_viscosity_old = dis_viscosity;
           dis_viscosity = dislocation_creep_prefactor[phase_index]
@@ -540,8 +540,8 @@ namespace aspect
               Assert(std::isfinite(in.strain_rate[i].norm()),
                      ExcMessage("Invalid strain_rate in the MaterialModelInputs. This is likely because it was "
                                 "not filled by the caller."));
-              const SymmetricTensor<2,dim> shear_strain_rate = deviator(in.strain_rate[i]);
-              const double second_strain_rate_invariant = std::sqrt(std::max(-second_invariant(shear_strain_rate), 0.));
+              const SymmetricTensor<2,dim> shear_strain_rate = Utilities::Tensors::consistent_deviator(in.strain_rate[i]);
+              const double second_strain_rate_invariant = std::sqrt(std::max(-Utilities::Tensors::consistent_second_invariant_of_deviatoric_tensor(shear_strain_rate), 0.));
 
               const double adiabatic_temperature = this->get_adiabatic_conditions().is_initialized()
                                                    ?
@@ -764,7 +764,7 @@ namespace aspect
           prm.declare_entry ("Thermal conductivity", "4.7",
                              Patterns::Double (0.),
                              "The value of the thermal conductivity $k$. "
-                             "Units: $\\frac{\\text{W}}{\\text{m}\\text{K}}$$\\frac{\\text{W}{\\text{m}\\text{K}}$.");
+                             "Units: $\\frac{\\text{W}}{\\text{m}\\text{K}}$.");
           prm.declare_entry ("Reference specific heat", "1250.",
                              Patterns::Double (0.),
                              "The value of the specific heat $cp$. "
@@ -814,7 +814,7 @@ namespace aspect
                              Patterns::List (Patterns::Double (0.)),
                              "The prefactor for the dislocation creep law $A_{dis}$. "
                              "List must have one more entry than the Phase transition depths. "
-                             "Units: $\\frac{\\text{Pa}^\\text{-n_{dis}}}{\\text{s}}$.");
+                             "Units: $\\frac{\\text{Pa}^{\\text{-n}_\\text{dis}}}{\\text{s}}$.");
           prm.declare_entry ("Diffusion creep exponent", "1.",
                              Patterns::List (Patterns::Double (0.)),
                              "The power-law exponent $n_{diff}$ for diffusion creep. "
@@ -834,7 +834,7 @@ namespace aspect
                              Patterns::List (Patterns::Double (0.)),
                              "The prefactor for the diffusion creep law $A_{diff}$. "
                              "List must have one more entry than the Phase transition depths. "
-                             "Units: $\\frac{ \\text{m}^\\text{p_{diff}}\\text{Pa}^\\text{-n_{diff}} }{\\text{s}}$.");
+                             "Units: $\\frac{\\text{m}^{\\text{p}_{\\text{diff}}}\\text{Pa}^{-\\text{n}_{\\text{diff}}}}{\\text{s}}$.");
           prm.declare_entry ("Diffusion creep grain size exponent", "3.",
                              Patterns::List (Patterns::Double (0.)),
                              "The diffusion creep grain size exponent $p_{diff}$ that determines the "

@@ -177,7 +177,9 @@ message(STATUS "Using ASPECT_WITH_PYTHON = '${ASPECT_WITH_PYTHON}'")
 if(ASPECT_WITH_PYTHON)
   find_package(Python3 COMPONENTS Interpreter Development NumPy)
   if(Python3_FOUND)
-    message(STATUS "  PYTHON_EXECUTABLE: ${Python3_EXECUTABLE}")
+    message(STATUS "  Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
+    message(STATUS "  Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
+    message(STATUS "  Python3_NumPy_INCLUDE_DIRS: ${Python3_NumPy_INCLUDE_DIRS}")
     list(APPEND ASPECT_INCLUDE_DIRS ${Python3_INCLUDE_DIRS} ${Python3_NumPy_INCLUDE_DIRS})
   else()
     message(FATAL_ERROR "Python not found. Consider disabling ASPECT_WITH_PYTHON.")
@@ -843,6 +845,11 @@ if(ASPECT_UNITY_BUILD)
     foreach(_T ${TARGET_EXECUTABLES})
       set_property(TARGET ${_T} PROPERTY UNITY_BUILD TRUE)
     endforeach()
+
+    # exclude main.cc from unity builds as this file needs to define the special
+    # Python numpy static object:
+    set_property(SOURCE ${ASPECT_MAIN_FILE} PROPERTY SKIP_UNITY_BUILD_INCLUSION TRUE )
+
     message(STATUS "Combining source files into unity build.")
   elseif(CMAKE_VERSION VERSION_LESS 3.16)
     message(FATAL_ERROR "ASPECT_UNITY_BUILD is currently only supported for CMake 3.16 and newer versions.")
