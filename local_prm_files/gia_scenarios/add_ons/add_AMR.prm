@@ -1,0 +1,7 @@
+subsection Mesh refinement
+  set Additional refinement times        = 1e3, 2e3, 3e3
+  set Initial adaptive refinement        = 0
+  set Initial global refinement          = 1
+  set Time steps between mesh refinement = 1
+  set Strategy                           = strain rate
+end

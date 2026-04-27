@@ -1,0 +1,40 @@
+
+
+subsection Compositional fields
+  set Number of fields = 10
+  set Names of fields = ve_stress_xx, ve_stress_yy, ve_stress_xy, ve_stress_xx_old, ve_stress_yy_old, ve_stress_xy_old, TZ, Asth, Lith
+  set Types of fields = stress, stress, stress, stress, stress, stress, chemical composition, chemical composition, chemical composition, chemical composition
+end
+
+subsection Initial composition model
+  set Model name = function
+
+  subsection Function
+    set Variable names      = x,y
+    set Function constants = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=2891e3, yLith=20e3, yTZ=100e3, region_width=100e3
+    # 6xstress, Asth, lith
+    set Function expression = 0; 0; 0; 0; 0; 0; \
+      0.5*(1+tanh((y-(Dbox-Tum-Tlith-TTZ))/yTZ))-0.5*(1+tanh((y-(Dbox-Tum-Tlith))/yTZ)); \
+      0.5*(1-tanh( (x-region_width)/yLith ))*( 0.5*(1+tanh( (y-(Dbox-Tum-Tlith) )/yTZ)) - 0.5*(1+tanh( (y-(Dbox-Tlith))/yLith) ) ); \
+      0.5*(1+tanh((y-(Dbox-Tlith))/yLith))
+  end
+end
+
+subsection Material model
+  #set Material averaging = harmonic average
+  set Model name =  viscoelastic
+  set Material averaging =  harmonic average only viscosity
+
+  subsection Viscoelastic
+    # viscoelastic specification as in spanda 2011
+    set Densities                   = 4491.76 # 3871, 3438, 3037
+    # background, compositional fields = Ncomp + 1
+    set Viscosities                 = 2.e21, 1.e21, 1.e21, 1.e40 # 5.0e20, 1.0e19, 1.e40 
+    set Elastic shear moduli        =  2.28340e11, 1.05490e11, 0.70363e11, 0.50605e11 
+
+
+subsection Material model
+  subsection Viscoelastic
+    set Viscosities                 = 1.e21, 1.e21, 1.e19, 1.e40 
+  end
+end

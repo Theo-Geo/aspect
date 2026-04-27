@@ -1,0 +1,23 @@
+subsection Initial composition model
+  set Model name = function
+  subsection Function
+    set Variable names      = x,z
+    set Function constants  = 
+    set Function expression = 0; 0; 0; 0; 0; 0; 0.5*( 1-tanh( (z-440e3)/100e3) ); \
+                                0.5*( tanh( (z-440e3)/50e3) - tanh( (z-853e3)/50e3) ); \
+                                0.5*( tanh( (z-853e3)/50e3) - tanh( (z-1237e3)/50e3) ); \
+                                0.5*( tanh( (z-1237e3)/50e3) - tanh( (z-1593e3)/50e3)); \
+                                0.5*( tanh( (z-1593e3)/50e3) - tanh( (z-1921e3)/50e3)); \
+                                0.5*( tanh( (z-1921e3)/50e3) - tanh( (z-2221e3)/50e3)); \
+                                0.5*( tanh( (z-2221e3)/50e3) - tanh( (z-2491e3)/50e3)); \
+                                0.5*( tanh( (z-2491e3)/50e3) - tanh( (z-2671e3)/50e3)); \
+                                0.5*( tanh( (z-2671e3)/20e3) - tanh( (z-2846e3)/20e3)); \
+                                0.5*(1+tanh((z-2846e3)/20e3));
+  end
+end
+
+subsection Material model
+  subsection Viscoelastic
+    set Viscosities = 3.2e21, 3.2e21, 3.2e21, 3.2e21, 3.2e21, 3.2e21, 1.5e21, 0.5e21, 0.5e21, 1.e18, 1.e40    
+  end
+end

@@ -1,0 +1,16 @@
+subsection Postprocess
+    set List of postprocessors = visualization, velocity statistics, topography, composition statistics, particles 
+    subsection Particles
+      set Time between data output = 1e3
+      set Data output format       = vtu
+  end
+end
+
+subsection Particles
+  set Minimum particles per cell  = 1
+  set Maximum particles per cell  = 2
+  set Load balancing strategy     = remove and add particles
+  set Allow cells without particles = true
+  set List of particle properties = integrated strain invariant 
+  set Particle generator name     = random uniform 
+end

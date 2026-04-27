@@ -1,0 +1,191 @@
+#  Global parameters
+set Dimension                              = 2
+set Start time                             = 0
+set End time                               = 1.e5
+set Use years instead of seconds           = true
+set Nonlinear solver scheme                = iterated Advection and Stokes
+set CFL number                             = 0.5
+set Maximum time step                      = 500.0
+#set Timing output frequency                = 1
+set Pressure normalization                 = no
+set Nonlinear solver tolerance             = 1e-5
+set Use operator splitting                 = true
+
+# Solver parameters
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Stokes solver type = block GMG
+    set Number of cheap Stokes solver steps = 6000
+    set Linear solver tolerance = 1e-7
+    set GMRES solver restart length = 100
+  end
+
+  subsection Operator splitting parameters
+    set Reaction solver type               = fixed step  
+    set Reaction time step                 = 5.0e6
+    set Reaction time steps per advection step = 1
+  end
+end
+
+# element types
+subsection Discretization
+  set Composition polynomial degree           = 2
+  set Stokes velocity polynomial degree       = 2
+  set Temperature polynomial degree           = 1
+  set Use locally conservative discretization = false
+  set Use discontinuous temperature discretization = false
+  set Use discontinuous composition discretization = true
+
+  subsection Stabilization parameters
+    set Use limiter for discontinuous composition solution = false, false, false, false, false, false, true, true, true, true, true, true, true, true, true, true, true
+    set Global composition maximum = 1.e11,  1.e11,  1.e11,  1.e11,  1.e11,  1.e11, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+    set Global composition minimum = -1.e11, -1.e11, -1.e11, -1.e11, -1.e11, -1.e11, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+  end
+end
+
+# Model geometry
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X repetitions = 50
+    set Y repetitions = 30
+    set X extent      = 5000.e3
+    set Y extent      = 2891.e3
+  end
+end
+
+# Mesh refinement specifications 
+subsection Mesh refinement
+  set Initial adaptive refinement        = 4
+  set Initial global refinement          = 1
+  set Time steps between mesh refinement = 0
+  set Strategy                           = minimum refinement function
+  subsection Minimum refinement function
+    set Coordinate system   = cartesian
+	set Variable names      = x,z
+	set Function expression = z>=1891.e3 ? z>=2771.e3 && x>=400.e3 && x<=1600.e3 ? 4 : 2 : 0
+  end
+end
+
+# Formulation classification
+subsection Formulation
+  set Enable elasticity = true
+end
+
+subsection Mesh deformation
+  set Mesh deformation boundary indicators = top: free surface
+  set Additional tangential mesh velocity boundary indicators = left,right
+  subsection Free surface
+    set Free surface stabilization theta = 0.5
+    set Surface velocity projection = normal
+  end
+end
+
+# Velocity boundary conditions
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = bottom, left, right 
+end
+
+# Prescribe a fixed vertical traction on the top boundary
+subsection Boundary traction model
+  set Prescribed traction boundary indicators = top y: function
+
+  subsection Function 
+    set Variable names = x, y, t
+    set Function constants = g=9.8, x0=1250.e3, H0=2.e3, rhoi = 931, t1=90e3, t2=10e3
+    set Function expression = 0; x<x0 ? (t-(t1+t2)*floor(t/(t1+t2)) <= t1) ? -g*H0*rhoi*(t-(t1+t2)*floor(t/(t1+t2)))/t1 : -g*H0*rhoi*(t2+t1-(t-(t1+t2)*floor(t/(t1+t2))))/t2 : 0; 
+    # x<x0 ? (t<t1 ? -g*H0*rhoi*t/t1 : -g*H0*rhoi) : 0;
+  end 
+end
+
+# Number and name of compositional fields
+subsection Compositional fields
+  set Number of fields = 17
+  set Names of fields  = ve_stress_xx, ve_stress_yy,ve_stress_xy, ve_stress_xx_old, ve_stress_yy_old, ve_stress_xy_old, \
+  LM6, LM5, LM4, LM3, LM2, LM1, \
+  TZ, UM2, UM1, PL, LT
+  set Types of fields = stress, stress, stress, stress, stress, stress, \
+      chemical composition, chemical composition, chemical composition, chemical composition, chemical composition, chemical composition, \
+      chemical composition, chemical composition, chemical composition, chemical composition, chemical composition
+end
+
+# Spatial domain of different compositional fields
+subsection Initial composition model
+  set Model name = function
+  subsection Function
+    set Variable names      = x,z
+    set Function constants  = x0=125.e3, DLith=45e3
+    set Function expression = 0; 0; 0; 0; 0; 0; 0.5*( 1-tanh( (z-440e3)/100e3) ); \
+                                0.5*( tanh( (z-440e3)/50e3) - tanh( (z-853e3)/50e3) ); \
+                                0.5*( tanh( (z-853e3)/50e3) - tanh( (z-1237e3)/50e3) ); \
+                                0.5*( tanh( (z-1237e3)/50e3) - tanh( (z-1593e3)/50e3)); \
+                                0.5*( tanh( (z-1593e3)/50e3) - tanh( (z-1921e3)/50e3)); \
+                                0.5*( tanh( (z-1921e3)/50e3) - tanh( (z-2221e3)/50e3)); \
+                                0.5*( tanh( (z-2221e3)/50e3) - tanh( (z-2491e3)/50e3)); \
+                                0.5*( tanh( (z-2491e3)/50e3) - tanh( (z-2746e3)/20e3)); \
+                                0.5*(1 + tanh( (x-x0)/20e3))*0.5*( tanh( (z-2746e3)/20e3) - tanh( (z-2891e3+DLith)/20e3)); \
+                                0.5*(1 - tanh( (x-x0)/20e3))*0.5*( tanh( (z-2746e3)/20e3) - tanh( (z-2891e3+DLith)/20e3)); \
+                                0.5*(1 + tanh( (z-2891e3+DLith)/20e3));
+  end
+end
+
+# Composition boundary conditions
+subsection Boundary composition model
+  set Allow fixed composition on outflow boundaries = true
+  set List of model names = initial composition
+end
+
+# Temperature boundary conditions
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = bottom, top, left, right
+  set List of model names = initial temperature
+end
+
+# Temperature initial conditions
+subsection Initial temperature model
+  set Model name = function
+  subsection Function
+    set Function expression = 293
+  end
+end
+
+# Material model
+subsection Material model
+
+  set Model name = viscoelastic
+  set Material averaging = harmonic average only viscosity
+
+  subsection Viscoelastic
+    set Densities                   = 4423.61
+    set Viscosities                 = 3.2e21, 3.2e21, 3.2e21, 3.2e21, 3.2e21, 3.2e21, 1.5e21, 0.5e21, 0.5e21, 0.5e21, 0.5e21, 1.e40   
+    set Elastic shear moduli        = 2.794e11, 2.794e11, 2.554e11, 2.325e11, 2.124e11, 1.912e11, 1.702e11, 1.064e11, 0.764e11, 0.667e11, 0.667e11, 0.596e11
+    set Use fixed elastic time step = true
+    set Fixed elastic time step     = 500.0
+    set Viscosity averaging scheme  = harmonic
+  end
+
+end
+
+# Gravity model
+subsection Gravity model
+  set Model name = vertical
+  subsection Vertical
+    set Magnitude = 9.815
+  end
+end
+
+# Post processing
+subsection Postprocess
+  set List of postprocessors = visualization, velocity statistics, topography, composition statistics
+  
+ subsection Visualization
+    set Time between graphical output = 5e3
+    set List of output variables = strain rate, material properties, named additional outputs
+  end
+
+  subsection Topography
+    set Output to file = true
+    set Time between text output = 5e3
+  end
+end

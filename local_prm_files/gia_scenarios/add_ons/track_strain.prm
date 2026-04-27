@@ -1,0 +1,19 @@
+subsection Postprocess
+    set List of postprocessors = visualization, velocity statistics, composition statistics, particles
+    subsection Particles
+      set Time between data output = 1e3
+      set Data output format       = vtu
+    end
+end
+
+subsection Particles
+  set List of particle properties = integrated strain invariant, velocity gradient, position, initial position
+  set Particle generator name = ascii file
+
+  subsection Generator
+    subsection Ascii file
+      set Data directory = $ASPECT_SOURCE_DIR/local_prm_files/gia_scenarios/particles/
+      set Data file name = few_particles.dat
+    end
+  end
+end

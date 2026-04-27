@@ -1,0 +1,31 @@
+#include ../local_prm_files/gia_scenarios/onecycle_high_visc_500km.prm
+#include ../local_prm_files/gia_scenarios/onecycle_VM5a.prm
+include ../local_prm_files/gia_scenarios/base/onecycle_VM5a_max.prm
+include ../local_prm_files/gia_scenarios/add_ons/add_AMR.prm
+include ../local_prm_files/gia_scenarios/add_ons/track_strain.prm
+include ../local_prm_files/gia_scenarios/add_ons/cycles_10.prm
+#include ../local_prm_files/gia_scenarios/big_domain.prm
+#include ../local_prm_files/gia_scenarios/low_viscosity.prm
+#include ../local_prm_files/gia_scenarios/plume_track.prm
+#include ../local_prm_files/gia_scenarios/add_particles.prm
+
+set Output directory = $ASPECT_SOURCE_DIR/../output/gia_scenarios/output_max_10cyc
+
+# subsection Boundary traction model
+#   subsection Function 
+#     set Function constants = g=9.8, x0=500.e3, H0=2e3, rhoi = 931, t1=90e3, t2=10e3
+#   end
+# end
+# set Maximum time step = 500.0
+
+subsection Mesh refinement
+    set Additional refinement times = 500.0, 1000.0
+end
+
+subsection Material model
+  subsection Viscoelastic
+    set Fixed elastic time step     = 500.0
+  end 
+end
+
+

@@ -1,0 +1,25 @@
+subsection Geometry model
+  set Model name = box
+  subsection Box
+    set X extent = 1500.e3
+    set Y extent = 500e3
+    set X repetitions = 15
+    set Y repetitions = 5
+  end
+  
+end
+
+# subsection Mesh refinement
+#   subsection Minimum refinement function
+#     set Function constants = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=500e3
+#   end
+# end
+
+subsection Initial composition model
+  subsection Function
+    set Function constants = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=500e3, yLith=20e3, yTZ=100e3
+  end
+end 
+
+
+

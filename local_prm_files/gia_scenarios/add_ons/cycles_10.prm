@@ -1,0 +1,7 @@
+set End time = 1e6
+
+subsection Postprocess
+    subsection Visualization
+        set Time between graphical output = 1e5       
+    end
+end

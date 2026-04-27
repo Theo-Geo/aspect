@@ -1,0 +1,12 @@
+subsection Geometry model
+
+  set Model name = box
+
+  subsection Box
+    set X extent = 3000.e3
+    set Y extent = 2891e3 # 500e3
+    set X repetitions = 30
+    set Y repetitions = 30 # 5
+  end
+  
+end
