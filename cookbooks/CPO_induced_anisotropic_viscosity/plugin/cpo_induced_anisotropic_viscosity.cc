@@ -192,11 +192,16 @@ namespace aspect
                                         min_strain_rate);
 
           // Create constant value to use for AV
-          const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*in.temperature[q]));
-          // The default values of fluidity constant (for stress in MPa and grain size in microns), activation energy come from Hirth and Kohlstedt (2003)
-          // The default value of grain size exponent comes from Hansen et al. (2016b)
-          // The resulting Gamme is equal to 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=0.001 meter (default value, converted to microns)
-          const double Gamma = (A_o/(std::pow(grain_size*1e6, grain_size_exponent)));
+          // const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*in.temperature[q]));
+          // // The default values of fluidity constant (for stress in MPa and grain size in microns), activation energy come from Hirth and Kohlstedt (2003)
+          // // The default value of grain size exponent comes from Hansen et al. (2016b)
+          // // The resulting Gamme is equal to 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=0.001 meter (default value, converted to microns)
+          // const double Gamma = (A_o/(std::pow(grain_size*1e6, grain_size_exponent)));
+
+          const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*std::max(in.temperature[q],1.0e-10)));
+          // 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
+          // The values of A_o and 0.73 were picked so that Gamma = 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=1000 microns
+          const double Gamma = (A_o/(std::pow(grain_size, grain_size_exponent)));
 
           // The computation of the viscosity tensor is only necessary after the simulator has been initialized
           // and when the condition allows dislocation creep
@@ -336,11 +341,11 @@ namespace aspect
 
               // Here we convert stress to MPa to be consistent with the constitutive equation defined in Signorelli et al. (2021),
               // in which the stress is in MPa.
-              SymmetricTensor<2,dim> stress = scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6;
+              SymmetricTensor<2,dim> stress = scalar_viscosity * V_r4 * deviatoric_strain_rate;
 
               while (std::abs(residual) > threshold && n_iterations < max_iteration)
                 {
-                  stress = (1./2.) * (stress + scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6);
+                  stress = (1./2.) * (stress + scalar_viscosity * V_r4 * deviatoric_strain_rate);
 
                   const Tensor<2,dim> S_CPO= R * stress * transpose(R);
 
@@ -474,9 +479,15 @@ namespace aspect
           prm.declare_entry ("Stress exponent", "3.5",
                              Patterns::Double(),
                              "Stress exponent for non-linear rheology");
-          prm.declare_entry ("Fluidity constant", "1.1e5",
+          prm.declare_entry ("Fluidity constant", "1.1e-18",
                              Patterns::Double(),
-                             "Prefactor for Arhenius temperature activation");
+                             "Prefactor for Arhenius temperature activation. " 
+                             "For mantle rheology Gamma0 should be in the range of 1e-16 to 1e-18. "
+                             "Experimental constraints on the value of Gamma0 for olivine dislocation creep "
+                             "are provided in Hirth and Kohlstedt (2003) and can be used to calibrate this "
+                             "parameter for different mantle conditions. The value of 1.1e-18 is chosen so that "
+                             "the reference viscosity is 1e21 Pa s at T=1600K and d=1000 microns, "
+                             "which is consistent with typical upper mantle conditions.");
           prm.declare_entry ("Activation energy", "530000.0",
                              Patterns::Double(),
                              "Activation energy for Arhenius temperature dependence of rheology");
