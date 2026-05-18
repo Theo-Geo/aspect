@@ -1,0 +1,315 @@
+# At the top, we define the number of space dimensions we would like to
+# work in:
+set Dimension                              = 2
+
+set Use years instead of seconds = true
+set End time                               = 3e7
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/plume_plate_shear/output-heyn-2024
+set Adiabatic surface temperature          = 1000
+set Maximum first time step = 1e5
+
+# Then there are variables that describe how the pressure should
+# be normalized. Here, we choose a zero average pressure
+# at the surface of the domain (for the current geometry, the
+# surface is defined as the top boundary).
+set Pressure normalization                 = surface
+set Surface pressure                       = 0
+
+####### NEW FOR MELT TRANSPORT ###############
+# For models with melt migration, there is a nonlinear coupling between
+# the Stokes system, the temperature, and the advection equation for the 
+# porosity (several material properties, such as the viscosities and the
+# permeability depend nonlinearly on the porosity; and changes in temperature
+# determine how much material is melting or freezing). 
+# Because of that, we use a nonlinear solver scheme ('iterated Advection and Stokes')
+# that iterates between all of these equations, and we have to set its 
+# solver tolerance and the maximum number of iterations separately from 
+# the linear solver parameters. 
+set Nonlinear solver scheme                = iterated Advection and Stokes
+set Max nonlinear iterations               = 30
+set Nonlinear solver tolerance             = 1e-5
+
+# In addition, melting and freezing normally happens on a much faster
+# time scale than the flow of melt, so we want to decouple the advection
+# of melt (and temperature) and the melting process itself. To do that, 
+# we use the operator splitting scheme, and define that for every 
+# advection time step, we want to do at least 10 reaction time steps. 
+# If these time steps would be larger than 10,000 years, we will do 
+# more reaction time steps (so that reaction time step size never exceeds 
+# 10,000 years). Here, we also specify the Stokes linear solver tolerance
+# and maximum number of cheap Stokes solver steps to improve the nonlinear
+# convergence behavior.
+set Use operator splitting                     = false
+subsection Solver parameters
+  # subsection Operator splitting parameters
+  #   set Reaction time step                     = 1e3
+  #   set Reaction time steps per advection step = 20
+  # end
+  subsection Stokes solver parameters
+    set Linear solver tolerance = 1e-8
+    set Number of cheap Stokes solver steps = 4000
+    set GMRES solver restart length         = 150 # 150
+  end
+end
+
+# subsection Melt settings
+#   # In addition, we now also specify in the model settings that we want to
+#   # run a model with melt transport. 
+#   set Include melt transport                  = true
+#   set Heat advection by melt                  = true
+# end
+
+# In models with melt transport, we always need a compositional field with
+# the name 'porosity'. Only the field with that name will be advected with
+# the melt velocity, all other compositional fields will continue to work
+# as before. Material models will typically query for the field with the 
+# name porosity to compute all melt material properties. 
+# In addition, the 'melt global' material model also requires a field with the
+# name 'peridotite'. This field is used to track how much material has been 
+# molten at each point of the model, so it tracks the information how the
+# composition of the rock changes due to partial melting events (sometimes
+# also called depletion). This is important, because usually less melt is
+# generated for a given temperature and pressure if the rock has undergone
+# melting before. Typically, material properties like the density are also
+# different for more or less depleted material.   
+# subsection Compositional fields
+#   set Number of fields = 2
+#   set Names of fields = porosity, peridotite
+# end
+
+subsection Discretization
+  #set Composition polynomial degree = 3
+  set Temperature polynomial degree = 3
+  set Stokes velocity polynomial degree = 3
+end
+
+# Now that our model uses compositional fields, we also need initial
+# conditions for the composition. 
+# We use the function plugin to set both fields to zero at the beginning
+# of the model run. 
+# subsection Initial composition model
+#   set Model name = function
+#   subsection Function
+#     set Function expression = 0; 0
+#     set Variable names      = x,y
+#   end
+# end
+
+# We again choose the initial composition as boundary condition
+# for all compositional fields. 
+# subsection Boundary composition model
+#   set List of model names = initial composition
+#   set Fixed composition boundary indicators   = right
+# end
+
+# Models with melt transport also need an additional boundary condition: 
+# the gradient of the fluid pressure at the model boundaries. This boundary 
+# condition indirectly also prescribes boundary conditions for the melt velocity, 
+# as the melt velocity is related to the fluid pressure gradient via Darcy's law.
+# If we choose the fluid pressure gradient = solid density * gravity, melt will
+# flow in and out of the model (even if the solid can not flow out) according to
+# the dynamic fluid pressure in the model. Conversely, if we choose the 
+# fluid pressure gradient = fluid density * gravity, melt will flow in or out
+# with the same velocity as the solid (so for a closed boundary, no melt will
+# flow in or out). This is what we choose as our boundary condition here. 
+# subsection Boundary fluid pressure model
+#   set Plugin name = density
+#   subsection Density
+#     set Density formulation = fluid density
+#   end
+# end
+
+
+############## END OF NEW PARTS #########################
+
+# Geometry
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X extent = 4000e3
+    set Y extent = 800e3
+    set X repetitions = 40
+    set Y repetitions = 8
+  end
+end
+
+# Initial temperature condition
+subsection Initial temperature model
+  set Model name = function
+
+  subsection Function
+    set Variable names      = x,z
+    
+    # the constants are: d=lithopshere thickness [m], Tl=temperature at LAB [K], Tb=temperature at domain bottom [K], Ts=surface temperature [K], dt=domain thickness [m], w=width [m], Tm=excess T [K], s=shift [m], Ttbl= temperature at top pf lower TBL [K]
+    # This lithosphere has 1 step at x=500 km, which is 50 km deep 
+    # 3800e3
+    set Function constants  = d=100e3, Tl=1500, Tb=1623, Ts=273, dt=8e5, w=5e5, Tm=250, s=30e5, Ttbl=1575
+    set Function expression = if(x<4005e3, \  
+                                  if(z>dt-d, Tl-(z-dt+d)*(Tl-Ts)/d, \
+                                  if(z<50e3, (Tb-z*(Tb-Ttbl)/(50e3))+exp(-z/2e5)*(Tm*exp( (-(x-s)^2)/(2*w^2))), Ttbl-(z-50e3)*(Ttbl-Tl)/(dt-d-50e3)) \
+                                  ), \
+                                if(z>dt-d-50e3, Tl-(z-dt+d+50e3)*(Tl-Ts)/(d+50e3), \
+                                  if(z<50e3, (Tb-z*(Tb-Ttbl)/(50e3))+exp(-z/2e5)*(Tm*exp( (-(x-s)^2)/(2*w^2))), Ttbl-(z-50e3)*(Ttbl-Tl)/(dt-d-50e3-50e3)) \
+                                  ) \
+                                )
+  end
+
+  # set Model name = function
+
+  # subsection Function
+  #   set Variable names      = x,z
+  #   set Function constants = x0=3000.e3, sigma=500.e3, zd=200.e3,\
+  #                            Dbox=800.e3, DLAB=150.e3, Dinit=50e3, \
+  #                            dTP=0, TLAB=1500, TLT=273, TLM=1623 # 1623 # K/m
+  #   # linear temperature gradient above and below LAB
+  #   set Function expression = z>= Dbox - DLAB \
+  #                             ? TLAB - (TLAB-TLT)*(z-Dbox+DLAB)/DLAB \
+  #                             : ( z<=Dinit \
+  #                              ? dTP*exp(-z/zd)*exp( -0.5*( (x-x0)/sigma)^2) + TLAB + (TLM-TLAB)/(Dbox-DLAB)*(Dbox-DLAB-z) \
+  #                             : TLAB + (TLM-TLAB)/(Dbox-DLAB)*(Dbox-DLAB-z) )
+  # end 
+
+end
+
+
+# Temperature boundary conditions
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = bottom, top
+  set List of model names     = box, function
+  set List of model operators = add
+
+  subsection Box
+    set Bottom temperature = 1623
+    set Top temperature    = 273
+  end
+
+  subsection Function
+    set Variable names      = x,z,t
+    # the parameters are: w=width [m], Tm=excess T [K], s=shift [m], Ts=surface T [K], Tb= bootm T [K], dt=domain thickness [m]
+    set Function constants  = w=5e5, Tm=250, s=3000e3, Ts=273, Tb=1623, dt=8e5
+    set Function expression = if(t<2e8, ((dt-z)/dt)*(Tm*exp((-(x-s)^2)/(2*w^2))), 0)
+    
+    set Maximal temperature = 1900
+    set Minimal temperature = 273
+  end
+
+end
+
+
+# Velocity boundary conditions
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = bottom
+  set Prescribed velocity boundary indicators = left x: function, right x: function, top: function
+  
+  subsection Function
+    set Variable names      = x,z,t
+    # parameters are: vel=plate velocity [m/year], dl=thickness lithosphere [m], dt=domain thickness [m], da=asthenosphere thickness
+    set Function constants  = vel=-0.02, dl=150e3, dt=800e3, da=150e3
+    set Function expression = if(z>=(dt-dl-30e3) && t>0, vel, if(z<(dt-dl-30e3) && z>(dt-dl-da) && t>0, vel*(z-dt+dl+da)/(da-30e3), 0)); 0
+  end
+end
+
+
+# Gravity model
+subsection Gravity model
+  set Model name = vertical
+
+  subsection Vertical
+    set Magnitude = 9.81 
+  end
+end
+
+
+# Material model, e.g. visocsity law
+subsection Material model
+  set Model name =  depth dependent
+  
+  subsection Depth dependent model
+    set Base model = diffusion dislocation
+    set Depth dependence method = List
+    set Depth list = 300e3, 805e3
+    set Viscosity list = 5.e22, 1.e24
+    set Reference viscosity = 1.0e22
+  end
+
+  # this viscosity model allows for stress dependence
+  # but when setting A=1, n=1 and m=0 in the formula in the manual, the viscosity is not
+  # stress-dependent any longer
+  subsection Diffusion dislocation
+    set Grain size exponents for diffusion creep = 0
+    set Prefactors for diffusion creep           = 8e-12
+    set Prefactors for dislocation creep         = 8e-12
+    set Stress exponents for diffusion creep     = 1
+    set Stress exponents for dislocation creep   = 1
+    set Densities                                = 3300.
+    set Maximum viscosity                        = 7e25
+    set Minimum viscosity                        = 5e17
+    set Activation energies for diffusion creep  = 250e3
+    set Activation energies for dislocation creep = 250e3
+    set Activation volumes for diffusion creep   = 0
+    set Activation volumes for dislocation creep = 0
+    
+    # # Add or modify parameters for melt?
+    # set Solid compressibility                    = 4.2e-12
+    # set Reference melt density                   = 3000.
+    # set Surface solidus                          = 1350.
+    # set Pressure solidus change                  = 7.8e-8
+    # set Melting time scale for operator splitting = 1e3
+    # set Reference permeability                    = 1e-8
+    # set Exponential melt weakening factor         = 27.
+    # set Depletion solidus change                  = 200
+    # set Reference bulk viscosity                  = 1e25
+  end
+end
+
+# Heating model
+# subsection Heating model
+#   set List of model names = constant heating
+
+#   # pay attention when converting heating values from W/m^3 to W/kg (as required here)
+#   # use the reference density of the material model to convert it by division
+#   subsection Constant heating
+#     set Radiogenic heating rate = 7.58e-12
+#   end
+# end
+
+
+# Compressible or incompressible
+subsection Formulation
+  set Formulation = Boussinesq approximation
+end
+
+
+# Mesh setup new
+subsection Mesh refinement
+  set Coarsening fraction                      = 0.2
+  set Refinement fraction                      = 0.65
+  
+  set Initial global refinement                = 2
+  set Initial adaptive refinement              = 3
+  set Minimum refinement level                 = 1
+  set Strategy                                 = temperature, viscosity, boundary
+  set Time steps between mesh refinement       = 1
+  
+  # refine at the top boundary
+  subsection Boundary
+    set Boundary refinement indicators = top
+  end
+end
+
+# Postprocessing
+subsection Postprocess
+  set List of postprocessors = visualization, velocity statistics, temperature statistics
+
+  subsection Visualization
+    set Time between graphical output = 2.e6
+    set List of output variables = material properties #, named additional outputs
+  end
+end
+
+
+## set that ASPET gives a checkpoint file for the last step
+subsection Termination criteria
+  set Checkpoint on termination        = true
+end
