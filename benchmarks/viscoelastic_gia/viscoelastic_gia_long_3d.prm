@@ -2,7 +2,7 @@ set Dimension                              = 3
 set Start time                             = 0
 set End time                               = 1.1e5
 set Use years instead of seconds           = true
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/ve-gia-benchmark/output_viscoelastic_gia_long_3d
+set Output directory                       = output_viscoelastic_gia_long_3d # $ASPECT_SOURCE_DIR/../output/ve-gia-benchmark/output_viscoelastic_gia_long_3d
 
 ### solver specifications
 set Nonlinear solver scheme                = iterated Advection and Stokes
@@ -74,7 +74,7 @@ subsection Mesh refinement
     set Coordinate system   = cartesian
 	  set Variable names      = x,y, z
     set Function constants  = TTZ=250e3, Tum=350.e3, Tlith=70.e3, Dbox=2891e3
-	  set Function expression = z>=Dbox-100e3 ? z>=Dbox-Tum ? 4 : 1 : 1
+	  set Function expression = z>=Dbox-100e3 ? z>=Dbox-Tum ? 4 : 2 : 1
   end
 end
 

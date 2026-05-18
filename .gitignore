@@ -60,6 +60,7 @@
 /Testing
 /local_prm_files/other
 /local_prm_files/changed_cookbooks
+/**/*_cluster.prm
 
 # used for clion:
 
