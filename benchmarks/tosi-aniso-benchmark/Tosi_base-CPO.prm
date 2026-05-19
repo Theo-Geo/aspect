@@ -171,7 +171,7 @@ end
 
 
 subsection Postprocess
-  set List of postprocessors = velocity statistics, temperature statistics, visualization, particles, crystal preferred orientation
+  set List of postprocessors = velocity statistics, temperature statistics, visualization, particles, crystal preferred orientation, velocity boundary statistics
   # subsection Depth average
   #   set List of output variables = temperature, viscosity
   #   set Time between graphical output = 0.05

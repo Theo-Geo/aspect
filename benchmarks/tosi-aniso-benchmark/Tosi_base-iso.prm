@@ -141,22 +141,20 @@ subsection Material model
   subsection CPO-induced Anisotropic Viscosity 
     set Reference viscosity = 0.1
     set Grain size = 1
+    set Activation energy = 0
+    set Fluidity constant = 1
+    set Grain size exponent = 0
+    set Stress exponent = 3.5
   end
 end
 
 
 subsection Postprocess
-  set List of postprocessors = velocity statistics, temperature statistics, visualization
-
-  subsection Depth average
-    set List of output variables = temperature, viscosity, velocity magnitude
-    set Time between graphical output = 0.2
-    set Number of zones = 10
-  end
+  set List of postprocessors = velocity statistics, temperature statistics, visualization,  velocity boundary statistics
 
   subsection Visualization
     set List of output variables = material properties, strain rate, named additional outputs, stress second invariant
-    set Time between graphical output = 0.05
+    set Time between graphical output = 0.002
 
     subsection Material properties
       set List of material properties = viscosity, density
