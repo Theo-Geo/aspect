@@ -145,6 +145,7 @@ subsection Material model
     set Fluidity constant = 1
     set Grain size exponent = 0
     set Stress exponent = 3.5
+    set Use analytical inversion = true 
   end
 end
 

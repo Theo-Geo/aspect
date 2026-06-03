@@ -166,6 +166,7 @@ subsection Material model
     set Stress exponent = 3.5
     set Grain size exponent = 0
     set Activation energy = 0
+    set Use analytical inversion = true 
   end
 end
 
@@ -187,7 +188,7 @@ subsection Postprocess
   subsection Crystal Preferred Orientation
     set Time between data output = 0.05
     set Write in background thread = true
-    set Compress cpo data files = true
+    set Compress cpo data files = false
     set Write out raw cpo data = mineral 0: volume fraction, mineral 0: Euler angles
     set Write out draw volume weighted cpo data = # mineral 0: volume fraction, mineral 0: Euler angles
   end
