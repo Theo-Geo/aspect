@@ -1,7 +1,7 @@
-include ../Tosi_base-CPO.prm
+include ../Tosi_base-2D-iso.prm
 
 set Additional shared libraries            = ./libtosi-aniso.so
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-viscoplastic-ana-CPO
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-plastic-2D-ana-iso
 set Nonlinear solver tolerance             = 1e-4 # 8e-4
 set End time                = 0.2
 set Maximum first time step = 1e-5

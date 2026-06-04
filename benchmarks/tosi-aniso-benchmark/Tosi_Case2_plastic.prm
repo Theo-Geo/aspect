@@ -1,7 +1,7 @@
-include ../Tosi_base-iso.prm
+include ../Tosi_base-2D-iso.prm
 
 set Additional shared libraries            = ./libtosi-aniso.so
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-plastic-iso-ana
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-plastic-2D-iso-ana
 set Maximum first time step = 1e-4
 set Nonlinear solver scheme =  single Advection, iterated Stokes
 set Nonlinear solver tolerance             = 1e-4

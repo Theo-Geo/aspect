@@ -115,6 +115,8 @@ namespace aspect
         double orthotropic_strain_rate_invariant( const Tensor<2,3> strain_rate_cpo_frame,
                                     const double F, const double G, const double H,
                                     const double L, const double M, const double N) const;
+        
+        SymmetricTensor<4,dim> Kelvin_to_r4_tensor(const Tensor<2,6> V) const;
 
         /**
          * This conversion from euler angles to rotation matrix is different from the function with the same name
