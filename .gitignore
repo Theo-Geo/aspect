@@ -58,6 +58,7 @@
 /tests/*.x.prm
 /tests/lib*.so
 /Testing
+/**/*_cluster.prm
 
 # used for clion:
 
