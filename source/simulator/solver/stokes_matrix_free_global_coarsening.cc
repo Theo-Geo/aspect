@@ -21,6 +21,7 @@
 #include <aspect/simulator/solver/matrix_free_operators.h>
 #include <aspect/simulator/solver/stokes_matrix_free.h>
 #include <aspect/simulator/solver/stokes_matrix_free_global_coarsening.h>
+#include <aspect/simulator/solver/block_stokes_preconditioner.h>
 #include <aspect/mesh_deformation/interface.h>
 
 #include <aspect/mesh_deformation/interface.h>
@@ -36,6 +37,7 @@
 #include <deal.II/lac/solver_idr.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/solver_bicgstab.h>
+#include <deal.II/lac/precondition.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_renumbering.h>
@@ -243,8 +245,6 @@ namespace aspect
         return;
       },
       active_viscosity_vector);
-
-      active_viscosity_vector.compress(VectorOperation::insert);
     }
 
     minimum_viscosity = dealii::Utilities::MPI::min(minimum_viscosity_local, this->get_mpi_communicator());
@@ -1191,25 +1191,46 @@ namespace aspect
     solver_control_expensive.enable_history_data();
 
     // create a cheap preconditioner that consists of only a single V-cycle
-    const internal::BlockSchurGMGPreconditioner<StokesMatrixType, ABlockMatrixType, BTBlockOperatorType,SchurComplementMatrixType, GMGPreconditioner, GMGPreconditioner>
-    preconditioner_cheap (stokes_matrix, A_block_matrix, BT_block, Schur_complement_block_matrix,
-                          prec_A, prec_Schur,
-                          /*do_solve_A*/false,
-                          /*do_solve_Schur*/false,
-                          sim.stokes_A_block_is_symmetric(),
-                          this->get_parameters().linear_solver_A_block_tolerance,
-                          this->get_parameters().linear_solver_S_block_tolerance);
+    using GMGPreconditioner = PreconditionMG<dim, VectorType, MGTransferMF<dim,GMGNumberType>>;
+    internal::InverseVelocityBlock<GMGPreconditioner, VectorType, ABlockMatrixType>
+    inverse_velocity_block_cheap(A_block_matrix,
+                                 prec_A,
+                                 /*do_solve_A = */ false,
+                                 sim.stokes_A_block_is_symmetric(),
+                                 this->get_parameters().linear_solver_A_block_tolerance);
+    internal::InverseVelocityBlock<GMGPreconditioner, VectorType, ABlockMatrixType>
+    inverse_velocity_block_expensive(A_block_matrix,
+                                     prec_A,
+                                     /*do_solve_A = */ true,
+                                     sim.stokes_A_block_is_symmetric(),
+                                     this->get_parameters().linear_solver_A_block_tolerance
+                                    );
+    using SchurApproximationType=internal::SchurApproximation<GMGPreconditioner, StokesMatrixType, SchurComplementMatrixType, VectorType>;
 
-    // create an expensive preconditioner that solves for the A block with CG
-    const internal::BlockSchurGMGPreconditioner<StokesMatrixType, ABlockMatrixType, BTBlockOperatorType, SchurComplementMatrixType, GMGPreconditioner, GMGPreconditioner>
-    preconditioner_expensive (stokes_matrix, A_block_matrix, BT_block,
+    internal::SchurApproximation<GMGPreconditioner, StokesMatrixType, SchurComplementMatrixType, VectorType>
+    schur_approximation_cheap(prec_Schur,
+                              stokes_matrix,
                               Schur_complement_block_matrix,
-                              prec_A, prec_Schur,
-                              /*do_solve_A*/true,
-                              /*do_solve_Schur*/true,
-                              sim.stokes_A_block_is_symmetric(),
-                              this->get_parameters().linear_solver_A_block_tolerance,
+                              /*do_solve_Schur*/ false,
                               this->get_parameters().linear_solver_S_block_tolerance);
+
+    internal::SchurApproximation<GMGPreconditioner, StokesMatrixType, SchurComplementMatrixType, VectorType>
+    schur_approximation_expensive(prec_Schur,
+                                  stokes_matrix,
+                                  Schur_complement_block_matrix,
+                                  /*do_solve_Schur*/ true,
+                                  this->get_parameters().linear_solver_S_block_tolerance);
+    const internal::BlockSchurPreconditioner<internal::InverseVelocityBlock<GMGPreconditioner,VectorType,ABlockMatrixType>,
+          SchurApproximationType,BTBlockOperatorType, dealii::LinearAlgebra::distributed::BlockVector<double>>
+          preconditioner_cheap (inverse_velocity_block_cheap,
+                                schur_approximation_cheap,
+                                BT_block);
+
+    const internal::BlockSchurPreconditioner<internal::InverseVelocityBlock<GMGPreconditioner,VectorType,ABlockMatrixType>,
+          SchurApproximationType, BTBlockOperatorType, dealii::LinearAlgebra::distributed::BlockVector<double>>
+          preconditioner_expensive (inverse_velocity_block_expensive,
+                                    schur_approximation_expensive,
+                                    BT_block);
 
     PrimitiveVectorMemory<dealii::LinearAlgebra::distributed::BlockVector<double>> mem;
 
@@ -1459,8 +1480,8 @@ namespace aspect
         catch (const std::exception &exc)
           {
             this->get_signals().post_stokes_solver(sim,
-                                                   preconditioner_cheap.n_iterations_Schur_complement() + preconditioner_expensive.n_iterations_Schur_complement(),
-                                                   preconditioner_cheap.n_iterations_A_block() + preconditioner_expensive.n_iterations_A_block(),
+                                                   schur_approximation_cheap.n_iterations() + schur_approximation_expensive.n_iterations(),
+                                                   inverse_velocity_block_cheap.n_iterations() + inverse_velocity_block_expensive.n_iterations(),
                                                    solver_control_cheap,
                                                    solver_control_expensive);
 
@@ -1481,8 +1502,8 @@ namespace aspect
 
     //signal successful solver
     this->get_signals().post_stokes_solver(sim,
-                                           preconditioner_cheap.n_iterations_Schur_complement() + preconditioner_expensive.n_iterations_Schur_complement(),
-                                           preconditioner_cheap.n_iterations_A_block() + preconditioner_expensive.n_iterations_A_block(),
+                                           schur_approximation_cheap.n_iterations() + schur_approximation_expensive.n_iterations(),
+                                           inverse_velocity_block_cheap.n_iterations() + inverse_velocity_block_expensive.n_iterations(),
                                            solver_control_cheap,
                                            solver_control_expensive);
 
@@ -1510,13 +1531,13 @@ namespace aspect
 
     if (print_details)
       {
-        this->get_pcout() << "     Schur complement preconditioner: " << preconditioner_cheap.n_iterations_Schur_complement()
+        this->get_pcout() << "     Schur complement preconditioner: " << schur_approximation_cheap.n_iterations()
                           << '+'
-                          << preconditioner_expensive.n_iterations_Schur_complement()
+                          << schur_approximation_expensive.n_iterations()
                           << " iterations." << std::endl;
-        this->get_pcout() << "     A block preconditioner: " << preconditioner_cheap.n_iterations_A_block()
+        this->get_pcout() << "     A block preconditioner: " << inverse_velocity_block_cheap.n_iterations()
                           << '+'
-                          << preconditioner_expensive.n_iterations_A_block()
+                          << inverse_velocity_block_expensive.n_iterations()
                           << " iterations." << std::endl;
       }
 
@@ -1646,12 +1667,40 @@ namespace aspect
 
             if (this->get_boundary_velocity_manager().get_tangential_boundary_velocity_indicators().size() > 0)
               {
-                VectorTools::compute_no_normal_flux_constraints (dof_handler,
-                                                                 0 /* first_vector_component */,
-                                                                 this->get_boundary_velocity_manager().get_tangential_boundary_velocity_indicators(),
-                                                                 constraint,
-                                                                 mapping);
+                if (!this->get_parameters().mesh_deformation_enabled)
+                  {
+                    VectorTools::compute_no_normal_flux_constraints(dof_handler,
+                                                                    /* first_vector_component= */
+                                                                    0,
+                                                                    this->get_boundary_velocity_manager().get_tangential_boundary_velocity_indicators(),
+                                                                    constraint,
+                                                                    mapping,
+                                                                    /* use_manifold_for_normal= */
+                                                                    true);
+                  }
+                else
+                  {
+                    // If mesh deformation is active, we need to distinguish between tangential velocity boundaries
+                    // where mesh deformation is active and where it is not. For the first case, we cannot use the manifold
+                    // normal vectors since those do not include the mesh deformation.
+                    VectorTools::compute_no_normal_flux_constraints(dof_handler,
+                                                                    /* first_vector_component= */
+                                                                    0,
+                                                                    this->get_mesh_deformation_handler().get_tangential_velocity_with_active_mesh_deformation_boundary_indicators(),
+                                                                    constraint,
+                                                                    mapping,
+                                                                    /* use_manifold_for_normal= */
+                                                                    false);
 
+                    VectorTools::compute_no_normal_flux_constraints(dof_handler,
+                                                                    /* first_vector_component= */
+                                                                    0,
+                                                                    this->get_mesh_deformation_handler().get_tangential_velocity_without_active_mesh_deformation_boundary_indicators(),
+                                                                    constraint,
+                                                                    mapping,
+                                                                    /* use_manifold_for_normal= */
+                                                                    true);
+                  }
               }
 
             DoFTools::make_hanging_node_constraints(dof_handler, constraint);

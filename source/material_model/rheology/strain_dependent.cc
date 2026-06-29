@@ -27,6 +27,7 @@
 #include <aspect/postprocess/particles.h>
 #include <aspect/particle/property/interface.h>
 #include <aspect/simulator.h>
+#include <aspect/simulator_signals.h>
 
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/fe_field_function.h>
@@ -431,6 +432,22 @@ namespace aspect
         strain_healing_temperature_dependent_recovery_rate = prm.get_double ("Strain healing temperature dependent recovery rate");
 
         strain_healing_temperature_dependent_prefactor = prm.get_double ("Strain healing temperature dependent prefactor");
+
+#if !DEAL_II_VERSION_GTE(9, 8, 0)
+        // Work around a memory leak in deal.II fixed in 9.8.0-pre
+        // (see dealii/dealii#19328) by dropping cached FEPointEvaluation
+        // objects at the start of every timestep so they are rebuilt fresh.
+        // The original workaround in #6877 only reset composition_evaluators;
+        // the velocity-gradient evaluator is also reset here since it is
+        // used for tensor-component strain weakening and would otherwise
+        // keep leaking.
+        this->get_signals().start_timestep.connect([&](const SimulatorAccess<dim> &)
+        {
+          evaluator.reset();
+          for (auto &composition_evaluator : composition_evaluators)
+            composition_evaluator.reset();
+        });
+#endif
       }
 
 
@@ -457,7 +474,7 @@ namespace aspect
                                                          &composition[0] + Tensor<2,dim>::n_independent_components));
               const SymmetricTensor<2,dim> L = symmetrize( strain * transpose(strain) );
 
-              const double strain_ii = std::fabs(second_invariant(L));
+              const double strain_ii = std::fabs(Utilities::Tensors::consistent_second_invariant_of_deviatoric_tensor(L));
               brittle_weakening = calculate_plastic_weakening(strain_ii, j);
               viscous_weakening = calculate_viscous_weakening(strain_ii, j);
               break;
@@ -633,7 +650,7 @@ namespace aspect
                    ExcMessage("Invalid strain_rate in the MaterialModelInputs. This is likely because it was "
                               "not filled by the caller."));
 
-            const double edot_ii = std::max(std::sqrt(std::max(-second_invariant(deviator(in.strain_rate[i])), 0.)),
+            const double edot_ii = std::max(std::sqrt(std::max(-Utilities::Tensors::consistent_second_invariant_of_deviatoric_tensor(Utilities::Tensors::consistent_deviator(in.strain_rate[i])), 0.)),
                                             min_strain_rate);
             double delta_e_ii = edot_ii*this->get_timestep();
 

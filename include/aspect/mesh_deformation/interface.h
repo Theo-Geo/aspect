@@ -107,6 +107,24 @@ namespace aspect
         compute_initial_deformation_on_boundary(const types::boundary_id boundary_indicator,
                                                 const Point<dim> &position) const;
 
+
+        /**
+         * A function that creates constraints for the initial deformation of the mesh.
+         *
+         * This function gives an alternative way to determine the initial deformation
+         * instead of using the compute_initial_deformation_on_boundary function. The
+         * default implementation of this function calls compute_initial_deformation_on_boundary()
+         * with the coordinates of each point on the boundary. If you need lower level control
+         * over the initial deformation or it is more efficient to provide constraints directly,
+         * override this function.
+         */
+        virtual
+        void
+        compute_initial_deformation_as_constraints(const Mapping<dim> &mapping,
+                                                   const DoFHandler<dim> &mesh_deformation_dof_handler,
+                                                   const types::boundary_id boundary_indicator,
+                                                   AffineConstraints<double> &constraints) const;
+
         /**
          * A function that creates constraints for the velocity of certain mesh
          * vertices (e.g. the surface vertices) for a specific set of boundaries.
@@ -256,6 +274,22 @@ namespace aspect
         get_active_mesh_deformation_boundary_indicators () const;
 
         /**
+         * Return a set of all the indicators of boundaries with
+         * mesh deformation objects on them that also have tangential
+         * velocity boundary conditions.
+         */
+        const std::set<types::boundary_id> &
+        get_tangential_velocity_with_active_mesh_deformation_boundary_indicators () const;
+
+        /**
+         * Return a set of all the indicators of boundaries without
+         * mesh deformation objects on them that have tangential
+         * velocity boundary conditions.
+         */
+        const std::set<types::boundary_id> &
+        get_tangential_velocity_without_active_mesh_deformation_boundary_indicators () const;
+
+        /**
          * Return a set of all the indicators of boundaries that
          * require surface stabilization.
          */
@@ -403,6 +437,24 @@ namespace aspect
         void compute_mesh_displacements_gmg ();
 
         /**
+         * Return the polynomial degree to use for the mesh mapping.
+         *
+         * If the parameter ``Mesh deformation mapping order'' is set to
+         * ``auto'', this function chooses an order based on the geometry and
+         * mesh deformation finite element degree. Otherwise, it returns the
+         * user-provided explicit value.
+         */
+        unsigned int get_mapping_degree () const;
+
+        /**
+         * Compute mesh displacements using GMG solver
+         * for a specific mesh deformation finite element degree.
+         * This is the implementation called by compute_mesh_displacements_gmg().
+         */
+        template <unsigned int mesh_deformation_fe_degree>
+        void compute_mesh_displacements_gmg_for_degree();
+
+        /**
          * Set up the vector with initial displacements of the mesh
          * due to the initial topography, as supplied by the initial
          * topography plugin based on the surface coordinates of the
@@ -528,6 +580,20 @@ namespace aspect
         std::set<types::boundary_id> prescribed_mesh_deformation_boundary_indicators;
 
         /**
+         * The set of boundary indicators for which mesh deformation
+         * objects are set and that also
+         * have tangential velocity boundary conditions.
+         */
+        std::set<types::boundary_id> tangential_velocity_with_prescribed_mesh_deformation_boundary_indicators;
+
+        /**
+         * The set of boundary indicators for which mesh deformation
+         * objects are not set and that
+         * have tangential velocity boundary conditions.
+         */
+        std::set<types::boundary_id> tangential_velocity_without_prescribed_mesh_deformation_boundary_indicators;
+
+        /**
          * A set of boundary indicators that denote those boundaries that are
          * allowed to move their mesh tangential to the boundary.
          */
@@ -562,6 +628,16 @@ namespace aspect
          * et. al. 2010 for more details.
          */
         double surface_theta;
+
+        /**
+         * Whether mapping order selection is automatic (``auto'').
+         */
+        bool use_automatic_mapping_order;
+
+        /**
+         * Explicit mapping order used when automatic selection is disabled.
+         */
+        unsigned int explicit_mapping_order;
 
         /**
          * If required, store a mapping for each multigrid level.

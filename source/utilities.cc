@@ -1294,7 +1294,8 @@ namespace aspect
 
                           // The url Array contains a separate array for each column of data.
                           // This will put each of these individual arrays into its own vector.
-                          urlArray->value(&tmp[0]);
+                          if (!tmp.empty())
+                            urlArray->value(tmp.data());
                           columns.push_back(tmp);
                         }
                       else
@@ -1416,7 +1417,8 @@ namespace aspect
           // Distribute data_size and data across processes
           std::ignore = Utilities::MPI::broadcast (comm, filesize, 0);
 
-          big_mpi::broadcast(&data_string[0], filesize, 0, comm);
+          if (filesize > 0)
+            big_mpi::broadcast(data_string.data(), filesize, 0, comm);
         }
       else
         {
@@ -1428,7 +1430,8 @@ namespace aspect
           data_string.resize(filesize);
 
           // Receive and store data
-          big_mpi::broadcast(&data_string[0], filesize, 0, comm);
+          if (filesize > 0)
+            big_mpi::broadcast(data_string.data(), filesize, 0, comm);
         }
 
       return data_string;
@@ -2767,6 +2770,7 @@ namespace aspect
             // then set the global solution vector to the values just computed
             cell->set_dof_values (local_projection, vec_result);
           }
+      vec_result.compress(VectorOperation::insert);
     }
 
 
@@ -3268,6 +3272,7 @@ namespace aspect
       }
 
 
+
       template <>
       const Tensor<3,3> &levi_civita<3>()
       {
@@ -3286,6 +3291,37 @@ namespace aspect
         }();
 
         return t;
+      }
+
+
+
+      template <int dim>
+      SymmetricTensor<2,dim> consistent_deviator(const SymmetricTensor<2,dim> &input)
+      {
+        SymmetricTensor<2,dim> output = input;
+
+        const double volumetric_value = trace(input) / 3.;
+        for (unsigned int d = 0; d < dim; ++d)
+          output[d][d] -= volumetric_value;
+
+        return output;
+      }
+
+
+
+      template <int dim>
+      double consistent_second_invariant_of_deviatoric_tensor(const SymmetricTensor<2,dim> &t)
+      {
+        if (dim == 2)
+          // Under plane strain assumption, t is not a 2D tensor, but a "slice" of
+          // a 3D tensor. Therefore, t[2][2] is generally not zero, but equals to
+          // -(t[0][0] + t[1][1]).
+          return -( t[0][0] * t[0][0] + t[1][1] * t[1][1]
+                    + (t[0][0] + t[1][1]) * (t[0][0] + t[1][1])
+                    + t[0][1] * t[0][1] * 2.0
+                  ) * 0.5;
+        else
+          return second_invariant(t);
       }
     }
 
@@ -3383,7 +3419,17 @@ namespace aspect
                                              const DoFHandler<dim>::active_cell_iterator &, \
                                              const std::vector<Point<dim>> &, \
                                              std::vector<double> &)> &function, \
-                   LinearAlgebra::BlockVector &vec_result);
+                   LinearAlgebra::BlockVector &vec_result); \
+  \
+  namespace Tensors \
+  { \
+    template \
+    SymmetricTensor<2,dim> consistent_deviator(const SymmetricTensor<2,dim> &); \
+    \
+    template \
+    double consistent_second_invariant_of_deviatoric_tensor(const SymmetricTensor<2,dim> &); \
+  }
+
 
     ASPECT_INSTANTIATE(INSTANTIATE)
 

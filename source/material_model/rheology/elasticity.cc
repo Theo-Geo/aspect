@@ -25,6 +25,7 @@
 #include <aspect/material_model/visco_plastic.h>
 #include <aspect/material_model/viscoelastic.h>
 #include <aspect/heating_model/shear_heating.h>
+#include <aspect/simulator_signals.h>
 
 #include <deal.II/base/signaling_nan.h>
 #include <deal.II/base/parameter_handler.h>
@@ -313,6 +314,21 @@ namespace aspect
                                "averaging schemes 'none', 'harmonic average only viscosity' and "
                                "'geometric average only viscosity'. This parameter ('Material averaging') "
                                "is located within the 'Material model' subsection."));
+
+#if !DEAL_II_VERSION_GTE(9, 8, 0)
+        // Work around a memory leak in deal.II fixed in 9.8.0-pre
+        // (see dealii/dealii#19328) by dropping cached FEPointEvaluation
+        // objects at the start of every timestep so they are rebuilt fresh.
+        // The original workaround in #6877 only reset evaluator_composition;
+        // the velocity-gradient evaluator (used for vorticity in stress
+        // rotation) is also reset here since it would otherwise keep leaking.
+        this->get_signals().start_timestep.connect([&](const SimulatorAccess<dim> &)
+        {
+          evaluator.reset();
+          evaluator_composition.reset();
+        });
+#endif
+
       }
 
 
@@ -401,7 +417,7 @@ namespace aspect
 
             for (unsigned int i=0; i < in.n_evaluation_points(); ++i)
               {
-                const SymmetricTensor<2, dim> deviatoric_strain_rate = deviator(in.strain_rate[i]);
+                const SymmetricTensor<2, dim> deviatoric_strain_rate = Utilities::Tensors::consistent_deviator(in.strain_rate[i]);
 
                 // Get stress from timestep $t$ rotated and advected into the current
                 // timestep $t+\Delta t_c$ from the compositional fields.
@@ -496,7 +512,7 @@ namespace aspect
         for (unsigned int i = 0; i < in.n_evaluation_points(); ++i)
           {
             const double eta = out.viscosities[i];
-            const SymmetricTensor<2, dim> deviatoric_strain_rate = deviator(in.strain_rate[i]);
+            const SymmetricTensor<2, dim> deviatoric_strain_rate = Utilities::Tensors::consistent_deviator(in.strain_rate[i]);
             const SymmetricTensor<2,dim> stress_0_advected (Utilities::Tensors::to_symmetric_tensor<dim>(&in.composition[i][stress_start_index],
                                                             &in.composition[i][stress_start_index]+n_independent_components));
             const SymmetricTensor<2,dim> stress_old (Utilities::Tensors::to_symmetric_tensor<dim>(&in.composition[i][stress_start_index+n_independent_components],
@@ -700,7 +716,7 @@ namespace aspect
 
                 // Compute the total stress at time t.
                 const SymmetricTensor<2, dim>
-                stress_t = 2. * effective_creep_viscosity * deviator(in.strain_rate[i])
+                stress_t = 2. * effective_creep_viscosity * Utilities::Tensors::consistent_deviator(in.strain_rate[i])
                            + effective_creep_viscosity / elastic_viscosity * stress_0_t
                            + (1. - timestep_ratio) * (1. - effective_creep_viscosity / elastic_viscosity) * stress_old;
 
@@ -841,7 +857,7 @@ namespace aspect
                                          const double viscosity_pre_yield,
                                          const double shear_modulus) const
       {
-        // The first term in the following expression is the deviator of the true strain rate
+        // The first term in the following expression is the overall strain rate
         // of one or more isostress rheological elements (in series).
         // One of these elements must be an elastic component (potentially damped).
         // The second term corresponds to a fictional strain rate arising from
@@ -858,10 +874,10 @@ namespace aspect
         const double timestep_ratio = calculate_timestep_ratio();
 
         const SymmetricTensor<2, dim>
-        edot_deviator = deviator(strain_rate) + 0.5 * stress_0_advected / elastic_viscosity
-                        + 0.5 * (1. - timestep_ratio) * (1.  - creep_viscosity/elastic_viscosity) * stress_old / creep_viscosity;
+        edot = strain_rate + 0.5 * stress_0_advected / elastic_viscosity
+               + 0.5 * (1. - timestep_ratio) * (1.  - creep_viscosity/elastic_viscosity) * stress_old / creep_viscosity;
 
-        return edot_deviator;
+        return edot;
       }
 
 

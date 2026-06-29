@@ -319,7 +319,7 @@ namespace aspect
                           "For heat transfer coefficient --> zero, the boundary approaches "
                           "insulating (Neumann) behaviour; "
                           "For heat transfer coefficient --> infinity, the boundary approaches "
-                          "a prescribed-temperature (Dirichlet) condition."
+                          "a prescribed-temperature (Dirichlet) condition. "
                           "The unit of the heat transfer coefficient is \\si{\\watt\\per\\meter\\squared\\per\\kelvin}."
                           "At the moment, this list can only have one entry. \n\n"
                           "The following heat transfer coefficient models are available:\n\n"
@@ -400,19 +400,6 @@ namespace aspect
 // explicit instantiations
 namespace aspect
 {
-  namespace internal
-  {
-    namespace Plugins
-    {
-      template <>
-      std::list<internal::Plugins::PluginList<BoundaryConvectiveHeating::Interface<2>>::PluginInfo> *
-      internal::Plugins::PluginList<BoundaryConvectiveHeating::Interface<2>>::plugins = nullptr;
-      template <>
-      std::list<internal::Plugins::PluginList<BoundaryConvectiveHeating::Interface<3>>::PluginInfo> *
-      internal::Plugins::PluginList<BoundaryConvectiveHeating::Interface<3>>::plugins = nullptr;
-    }
-  }
-
   namespace BoundaryConvectiveHeating
   {
 #define INSTANTIATE(dim) \

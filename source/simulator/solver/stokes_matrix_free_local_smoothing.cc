@@ -29,6 +29,7 @@
 #include <aspect/melt.h>
 #include <aspect/newton.h>
 
+#include <deal.II/base/template_constraints.h>
 #include <deal.II/numerics/vector_tools.h>
 
 #include <deal.II/matrix_free/tools.h>
@@ -37,6 +38,7 @@
 #include <deal.II/lac/solver_idr.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/solver_bicgstab.h>
+#include <deal.II/lac/precondition.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_renumbering.h>
@@ -276,8 +278,6 @@ namespace aspect
         return;
       },
       active_viscosity_vector);
-
-      active_viscosity_vector.compress(VectorOperation::insert);
     }
 
     minimum_viscosity = dealii::Utilities::MPI::min(minimum_viscosity_local, this->get_mpi_communicator());
@@ -454,12 +454,14 @@ namespace aspect
           active_cell_data.enable_newton_derivatives = (Parameters<dim>::is_defect_correction(this->get_parameters().nonlinear_solver)
                                                         && this->get_newton_handler().parameters.newton_derivative_scaling_factor != 0);
           active_cell_data.enable_prescribed_dilation = this->get_parameters().enable_prescribed_dilation;
+          active_cell_data.average_newton_factors = (this->get_parameters().material_averaging != MaterialModel::MaterialAveraging::none);
 
           // TODO: these are not implemented yet
           for (unsigned int level=0; level<n_levels; ++level)
             {
               level_cell_data[level].enable_newton_derivatives = false;
               level_cell_data[level].enable_prescribed_dilation = false;
+              level_cell_data[level].average_newton_factors = false;
             }
 
           FEValues<dim> fe_values (this->get_mapping(),
@@ -556,15 +558,8 @@ namespace aspect
 
                       for (unsigned int q=0; q<n_q_points; ++q)
                         {
-                          // use the correct strain rate for the Jacobian
-                          // when elasticity is enabled use viscoelastic strain rate
-                          // when stabilization is enabled, use the deviatoric strain rate because the SPD factor
-                          // that is computed is only safe for the deviatoric strain rate (see PR #5580 and issue #5555)
-                          SymmetricTensor<2,dim> effective_strain_rate = in.strain_rate[q];
-                          if (elastic_out != nullptr)
-                            effective_strain_rate = elastic_out->viscoelastic_strain_rate[q];
-                          else if ((this->get_newton_handler().parameters.velocity_block_stabilization & Newton::Parameters::Stabilization::PD) != Newton::Parameters::Stabilization::none)
-                            effective_strain_rate = deviator(effective_strain_rate);
+                          const SymmetricTensor<2,dim> effective_strain_rate
+                            = (elastic_out == nullptr ? in.strain_rate[q] : elastic_out->viscoelastic_strain_rate[q]);
 
                           // use the spd factor when the stabilization is PD or SPD.
                           const double alpha =  (this->get_newton_handler().parameters.velocity_block_stabilization
@@ -579,14 +574,19 @@ namespace aspect
                                                 1.0;
 
                           active_cell_data.newton_factor_wrt_pressure_table(cell,q)[i]
-                            = derivatives->viscosity_derivative_wrt_pressure[q] *
-                              derivatives->viscosity_derivative_averaging_weights[q] *
-                              newton_derivative_scaling_factor;
+                            = newton_derivative_scaling_factor * derivatives->viscosity_derivative_wrt_pressure[q]
+                              * (active_cell_data.average_newton_factors ? derivatives->viscosity_derivative_averaging_weights[q] : 1.0);
                           Assert(std::isfinite(active_cell_data.newton_factor_wrt_pressure_table(cell,q)[i]),
-                                 ExcMessage("active_cell_data.newton_factor_wrt_pressure_table is not finite: " + std::to_string(active_cell_data.newton_factor_wrt_pressure_table(cell,q)[i]) +
-                                            ". Relevant variables are derivatives->viscosity_derivative_wrt_pressure[q] = " + std::to_string(derivatives->viscosity_derivative_wrt_pressure[q]) +
-                                            ", derivatives->viscosity_derivative_averaging_weights[q] = " + std::to_string(derivatives->viscosity_derivative_averaging_weights[q]) +
-                                            ", and newton_derivative_scaling_factor = " + std::to_string(newton_derivative_scaling_factor)));
+                                 ExcMessage("active_cell_data.newton_factor_wrt_pressure_table is not finite: "
+                                            + std::to_string(active_cell_data.newton_factor_wrt_pressure_table(cell,q)[i])
+                                            + ". Relevant variables are derivatives->viscosity_derivative_wrt_pressure[q] = "
+                                            + std::to_string(derivatives->viscosity_derivative_wrt_pressure[q])
+                                            + (active_cell_data.average_newton_factors ?
+                                               ", derivatives->viscosity_derivative_averaging_weights[q] = "
+                                               + std::to_string(derivatives->viscosity_derivative_averaging_weights[q])
+                                               + ", and newton_derivative_scaling_factor = "
+                                               + std::to_string(newton_derivative_scaling_factor) :
+                                               "")));
 
                           for (unsigned int m=0; m<dim; ++m)
                             for (unsigned int n=0; n<dim; ++n)
@@ -595,14 +595,15 @@ namespace aspect
                                   = effective_strain_rate[m][n];
 
                                 active_cell_data.newton_factor_wrt_strain_rate_table(cell, q)[m][n][i]
-                                  = derivatives->viscosity_derivative_wrt_strain_rate[q][m][n] *
-                                    derivatives->viscosity_derivative_averaging_weights[q] *
-                                    newton_derivative_scaling_factor * alpha;
+                                  = newton_derivative_scaling_factor * alpha * derivatives->viscosity_derivative_wrt_strain_rate[q][m][n]
+                                    * (active_cell_data.average_newton_factors ? derivatives->viscosity_derivative_averaging_weights[q] : 1.0);
 
                                 Assert(std::isfinite(active_cell_data.strain_rate_table(cell, q)[m][n][i]),
-                                       ExcMessage("active_cell_data.strain_rate_table has an element which is not finite: " + std::to_string(active_cell_data.strain_rate_table(cell, q)[m][n][i])));
+                                       ExcMessage("active_cell_data.strain_rate_table has an element which is not finite: "
+                                                  + std::to_string(active_cell_data.strain_rate_table(cell, q)[m][n][i])));
                                 Assert(std::isfinite(active_cell_data.newton_factor_wrt_strain_rate_table(cell, q)[m][n][i]),
-                                       ExcMessage("active_cell_data.newton_factor_wrt_strain_rate_table has an element which is not finite: " + std::to_string(active_cell_data.newton_factor_wrt_strain_rate_table(cell, q)[m][n][i])));
+                                       ExcMessage("active_cell_data.newton_factor_wrt_strain_rate_table has an element which is not finite: "
+                                                  + std::to_string(active_cell_data.newton_factor_wrt_strain_rate_table(cell, q)[m][n][i])));
                               }
 
                           if (active_cell_data.enable_prescribed_dilation)
@@ -610,9 +611,12 @@ namespace aspect
                               active_cell_data.dilation_derivative_wrt_pressure_table(cell,q)[i]
                                 = derivatives->dilation_derivative_wrt_pressure[q] * newton_derivative_scaling_factor;
                               Assert(std::isfinite(active_cell_data.dilation_derivative_wrt_pressure_table(cell,q)[i]),
-                                     ExcMessage("active_cell_data.dilation_derivative_wrt_pressure_table is not finite: " + std::to_string(active_cell_data.dilation_derivative_wrt_pressure_table(cell,q)[i]) +
-                                                ". Relevant variables are derivatives->dilation_derivative_wrt_pressure[q] = " + std::to_string(derivatives->dilation_derivative_wrt_pressure[q]) +
-                                                " and newton_derivative_scaling_factor = " + std::to_string(newton_derivative_scaling_factor)));
+                                     ExcMessage("active_cell_data.dilation_derivative_wrt_pressure_table is not finite: "
+                                                + std::to_string(active_cell_data.dilation_derivative_wrt_pressure_table(cell,q)[i])
+                                                + ". Relevant variables are derivatives->dilation_derivative_wrt_pressure[q] = "
+                                                + std::to_string(derivatives->dilation_derivative_wrt_pressure[q])
+                                                + " and newton_derivative_scaling_factor = "
+                                                + std::to_string(newton_derivative_scaling_factor)));
 
                               for (unsigned int m=0; m<dim; ++m)
                                 for (unsigned int n=0; n<dim; ++n)
@@ -1210,26 +1214,53 @@ namespace aspect
     solver_control_cheap.enable_history_data();
     solver_control_expensive.enable_history_data();
 
-    // create a cheap preconditioner that consists of only a single V-cycle
-    const internal::BlockSchurGMGPreconditioner<StokesMatrixType, ABlockMatrixType, BTBlockOperatorType,SchurComplementMatrixType, GMGPreconditioner, GMGPreconditioner>
-    preconditioner_cheap (stokes_matrix, A_block_matrix, BT_block, Schur_complement_block_matrix,
-                          prec_A, prec_Schur,
-                          /*do_solve_A*/false,
-                          /*do_solve_Schur*/false,
-                          sim.stokes_A_block_is_symmetric(),
-                          this->get_parameters().linear_solver_A_block_tolerance,
-                          this->get_parameters().linear_solver_S_block_tolerance);
+    using GMGPreconditioner = PreconditionMG<dim, VectorType, MGTransferMF<dim,GMGNumberType>>;
+    internal::InverseVelocityBlock<GMGPreconditioner,VectorType,ABlockMatrixType> inverse_velocity_block_cheap(
+      A_block_matrix,
+      prec_A,
+      /* do_solve_A = */ false,
+      sim.stokes_A_block_is_symmetric(),
+      this->get_parameters().linear_solver_A_block_tolerance);
 
-    // create an expensive preconditioner that solves for the A block with CG
-    const internal::BlockSchurGMGPreconditioner<StokesMatrixType, ABlockMatrixType, BTBlockOperatorType, SchurComplementMatrixType, GMGPreconditioner, GMGPreconditioner>
-    preconditioner_expensive (stokes_matrix, A_block_matrix, BT_block,
-                              Schur_complement_block_matrix,
-                              prec_A, prec_Schur,
-                              /*do_solve_A*/true,
-                              /*do_solve_Schur*/true,
-                              sim.stokes_A_block_is_symmetric(),
-                              this->get_parameters().linear_solver_A_block_tolerance,
-                              this->get_parameters().linear_solver_S_block_tolerance);
+    internal::InverseVelocityBlock<GMGPreconditioner,VectorType, ABlockMatrixType> inverse_velocity_block_expensive(
+      A_block_matrix,
+      prec_A,
+      /* do_solve_A = */ true,
+      sim.stokes_A_block_is_symmetric(),
+      this->get_parameters().linear_solver_A_block_tolerance);
+
+    using SchurApproximationType = internal::SchurApproximation<GMGPreconditioner,StokesMatrixType,SchurComplementMatrixType, VectorType>;
+    internal::SchurApproximation<GMGPreconditioner, StokesMatrixType, SchurComplementMatrixType, VectorType> schur_approximation_cheap(
+      prec_Schur,
+      stokes_matrix,
+      Schur_complement_block_matrix,
+      /*do_solve_Schur*/ false,
+      this->get_parameters().linear_solver_S_block_tolerance);
+
+    internal::SchurApproximation<GMGPreconditioner, StokesMatrixType, SchurComplementMatrixType, VectorType> schur_approximation_expensive(
+      prec_Schur,
+      stokes_matrix,
+      Schur_complement_block_matrix,
+      /*do_solve_Schur*/ true,
+      this->get_parameters().linear_solver_S_block_tolerance);
+
+    const internal::BlockSchurPreconditioner<internal::InverseVelocityBlock<GMGPreconditioner,VectorType,ABlockMatrixType>,
+          SchurApproximationType,BTBlockOperatorType, dealii::LinearAlgebra::distributed::BlockVector<double>>
+          preconditioner_cheap (
+            inverse_velocity_block_cheap,
+            schur_approximation_cheap,
+            BT_block);
+
+    const internal::BlockSchurPreconditioner<internal::InverseVelocityBlock<GMGPreconditioner,VectorType,ABlockMatrixType>,
+          SchurApproximationType, BTBlockOperatorType, dealii::LinearAlgebra::distributed::BlockVector<double>>
+          preconditioner_expensive (
+            inverse_velocity_block_expensive,
+            schur_approximation_expensive,
+            BT_block);
+
+
+
+
 
     PrimitiveVectorMemory<dealii::LinearAlgebra::distributed::BlockVector<double>> mem;
 
@@ -1478,9 +1509,11 @@ namespace aspect
         // if the solver fails trigger the post stokes solver signal and throw an exception
         catch (const std::exception &exc)
           {
+            ++sim.linear_solver_failures;
+
             this->get_signals().post_stokes_solver(sim,
-                                                   preconditioner_cheap.n_iterations_Schur_complement() + preconditioner_expensive.n_iterations_Schur_complement(),
-                                                   preconditioner_cheap.n_iterations_A_block() + preconditioner_expensive.n_iterations_A_block(),
+                                                   schur_approximation_cheap.n_iterations() + schur_approximation_expensive.n_iterations(),
+                                                   inverse_velocity_block_cheap.n_iterations() + inverse_velocity_block_expensive.n_iterations(),
                                                    solver_control_cheap,
                                                    solver_control_expensive);
 
@@ -1490,19 +1523,34 @@ namespace aspect
             if (this->get_parameters().n_expensive_stokes_solver_steps > 0)
               solver_controls.push_back(solver_control_expensive);
 
-            Utilities::throw_linear_solver_failure_exception("iterative Stokes solver",
-                                                             "StokesMatrixFreeHandlerLocalSmoothingImplementation::solve",
-                                                             solver_controls,
-                                                             exc,
-                                                             this->get_mpi_communicator(),
-                                                             this->get_parameters().output_directory+"solver_history.txt");
+            // Determine whether to warn or throw an exception due to linear solver failure
+            switch (this->get_parameters().linear_solver_failure_strategy)
+              {
+                case Parameters<dim>::LinearSolverFailureStrategy::continue_with_nonlinear_solver:
+                {
+                  this->get_pcout() << " linear solver failed (GMG), continuing" << std::endl;
+                  break;
+                }
+                case Parameters<dim>::LinearSolverFailureStrategy::abort:
+                {
+                  Utilities::throw_linear_solver_failure_exception("iterative Stokes solver",
+                                                                   "StokesMatrixFreeHandlerLocalSmoothingImplementation::solve",
+                                                                   solver_controls,
+                                                                   exc,
+                                                                   this->get_mpi_communicator(),
+                                                                   this->get_parameters().output_directory+"solver_history.txt");
+                  break;
+                }
+                default:
+                  AssertThrow(false, ExcNotImplemented());
+              }
           }
       }
 
     //signal successful solver
     this->get_signals().post_stokes_solver(sim,
-                                           preconditioner_cheap.n_iterations_Schur_complement() + preconditioner_expensive.n_iterations_Schur_complement(),
-                                           preconditioner_cheap.n_iterations_A_block() + preconditioner_expensive.n_iterations_A_block(),
+                                           schur_approximation_cheap.n_iterations() + schur_approximation_expensive.n_iterations(),
+                                           inverse_velocity_block_cheap.n_iterations() + inverse_velocity_block_expensive.n_iterations(),
                                            solver_control_cheap,
                                            solver_control_expensive);
 
@@ -1530,13 +1578,13 @@ namespace aspect
 
     if (print_details)
       {
-        this->get_pcout() << "     Schur complement preconditioner: " << preconditioner_cheap.n_iterations_Schur_complement()
+        this->get_pcout() << "     Schur complement preconditioner: " << schur_approximation_cheap.n_iterations()
                           << '+'
-                          << preconditioner_expensive.n_iterations_Schur_complement()
+                          << schur_approximation_expensive.n_iterations()
                           << " iterations." << std::endl;
-        this->get_pcout() << "     A block preconditioner: " << preconditioner_cheap.n_iterations_A_block()
+        this->get_pcout() << "     A block preconditioner: " << inverse_velocity_block_cheap.n_iterations()
                           << '+'
-                          << preconditioner_expensive.n_iterations_A_block()
+                          << inverse_velocity_block_expensive.n_iterations()
                           << " iterations." << std::endl;
       }
 
@@ -1607,12 +1655,40 @@ namespace aspect
       sim.compute_initial_velocity_boundary_constraints(constraints_v);
       sim.compute_current_velocity_boundary_constraints(constraints_v);
 
-      VectorTools::compute_no_normal_flux_constraints (dof_handler_v,
-                                                       /* first_vector_component= */
-                                                       0,
-                                                       this->get_boundary_velocity_manager().get_tangential_boundary_velocity_indicators(),
-                                                       constraints_v,
-                                                       this->get_mapping());
+      if (!this->get_parameters().mesh_deformation_enabled)
+        {
+          VectorTools::compute_no_normal_flux_constraints(dof_handler_v,
+                                                          /* first_vector_component= */
+                                                          0,
+                                                          this->get_boundary_velocity_manager().get_tangential_boundary_velocity_indicators(),
+                                                          constraints_v,
+                                                          this->get_mapping(),
+                                                          /* use_manifold_for_normal= */
+                                                          true);
+        }
+      else
+        {
+          // If mesh deformation is active, we need to distinguish between tangential velocity boundaries
+          // where mesh deformation is active and where it is not. For the first case, we cannot use the manifold
+          // normal vectors since those do not include the mesh deformation.
+          VectorTools::compute_no_normal_flux_constraints(dof_handler_v,
+                                                          /* first_vector_component= */
+                                                          0,
+                                                          this->get_mesh_deformation_handler().get_tangential_velocity_with_active_mesh_deformation_boundary_indicators(),
+                                                          constraints_v,
+                                                          this->get_mapping(),
+                                                          /* use_manifold_for_normal= */
+                                                          false);
+
+          VectorTools::compute_no_normal_flux_constraints(dof_handler_v,
+                                                          /* first_vector_component= */
+                                                          0,
+                                                          this->get_mesh_deformation_handler().get_tangential_velocity_without_active_mesh_deformation_boundary_indicators(),
+                                                          constraints_v,
+                                                          this->get_mapping(),
+                                                          /* use_manifold_for_normal= */
+                                                          true);
+        }
 
       sim.prescribed_solution_manager.constrain_solution(constraints_v);
 
@@ -1789,7 +1865,7 @@ namespace aspect
 #endif
             level_constraints_v.close();
 
-            std::set<types::boundary_id> no_flux_boundaries
+            const std::set<types::boundary_id> &no_flux_boundaries
               = this->get_boundary_velocity_manager().get_tangential_boundary_velocity_indicators();
             if (!no_flux_boundaries.empty())
               {
@@ -1802,13 +1878,48 @@ namespace aspect
                 const IndexSet &refinement_edge_indices =
                   mg_constrained_dofs_A_block.get_refinement_edge_indices(level);
 
-                VectorTools::compute_no_normal_flux_constraints_on_level(dof_handler_v,
-                                                                         0,
-                                                                         no_flux_boundaries,
-                                                                         user_level_constraints,
-                                                                         mapping,
-                                                                         refinement_edge_indices,
-                                                                         level);
+                if (!this->get_parameters().mesh_deformation_enabled)
+                  {
+                    VectorTools::compute_no_normal_flux_constraints_on_level(dof_handler_v,
+                                                                             0,
+                                                                             no_flux_boundaries,
+                                                                             user_level_constraints,
+                                                                             mapping,
+                                                                             refinement_edge_indices,
+                                                                             level,
+                                                                             /*use_manifold_for_normal=*/
+                                                                             true);
+                  }
+                else
+                  {
+                    // If mesh deformation is active, we need to distinguish between tangential velocity boundaries
+                    // where mesh deformation is active and where it is not. For the first case, we cannot use the manifold
+                    // normal vectors since those do not include the mesh deformation.
+
+                    const auto &no_flux_boundaries_with_mesh_deformation =
+                      this->get_mesh_deformation_handler().get_tangential_velocity_with_active_mesh_deformation_boundary_indicators();
+                    VectorTools::compute_no_normal_flux_constraints_on_level(dof_handler_v,
+                                                                             0,
+                                                                             no_flux_boundaries_with_mesh_deformation,
+                                                                             user_level_constraints,
+                                                                             mapping,
+                                                                             refinement_edge_indices,
+                                                                             level,
+                                                                             /*use_manifold_for_normal=*/
+                                                                             false);
+
+                    const auto &no_flux_boundaries_without_mesh_deformation =
+                      this->get_mesh_deformation_handler().get_tangential_velocity_without_active_mesh_deformation_boundary_indicators();
+                    VectorTools::compute_no_normal_flux_constraints_on_level(dof_handler_v,
+                                                                             0,
+                                                                             no_flux_boundaries_without_mesh_deformation,
+                                                                             user_level_constraints,
+                                                                             mapping,
+                                                                             refinement_edge_indices,
+                                                                             level,
+                                                                             /*use_manifold_for_normal=*/
+                                                                             true);
+                  }
 
                 user_level_constraints.close();
                 mg_constrained_dofs_A_block.add_user_constraints(level,

@@ -255,7 +255,7 @@ namespace aspect
 
         /**
          * A function that is called at the beginning of each time step,
-         * calling the update function of the individual heating models.
+         * calling the update function of the individual plugins.
          */
         void
         update () override;
@@ -604,10 +604,10 @@ namespace aspect
          * reason: objects with static initializers (such as =0) are
          * initialized before any objects for which one needs to run
          * constructors. Consequently, we can be sure that this pointer is set
-         * to zero before we ever try to register a postprocessor, and
-         * consequently whenever we run Manager::register_postprocessor, we
+         * to zero before we ever try to register a plugin, and
+         * consequently whenever we run register_plugin(), we
          * need not worry whether we try to add something to this list before
-         * the lists's constructor has successfully run
+         * the lists's constructor has successfully run.
          */
         static std::list<PluginInfo> *plugins;
 

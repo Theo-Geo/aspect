@@ -263,6 +263,18 @@ namespace aspect
     };
 
     /**
+     * This class assembles the compressible adjustment to the Newton Stokes preconditioner.
+     */
+    template <int dim>
+    class NewtonStokesCompressiblePreconditioner : public NewtonInterface<dim>
+    {
+      public:
+        void
+        execute (internal::Assembly::Scratch::ScratchBase<dim>  &scratch_base,
+                 internal::Assembly::CopyData::CopyDataBase<dim> &data_base) const override;
+    };
+
+    /**
      * This class assembles the terms for the matrix and right-hand-side of the incompressible
      * Newton Stokes system for the current cell.
      */
@@ -294,74 +306,6 @@ namespace aspect
         void
         execute(internal::Assembly::Scratch::ScratchBase<dim>  &scratch_base,
                 internal::Assembly::CopyData::CopyDataBase<dim> &data_base) const override;
-    };
-
-    /**
-     * This class assembles the right-hand-side term of the Newton Stokes system
-     * that is caused by the compressibility in the mass conservation equation.
-     * This function approximates this term as
-     * $- \nabla \mathbf{u} = \frac{1}{\rho} \frac{\partial rho}{\partial z} \frac{\mathbf{g}}{||\mathbf{g}||} \cdot \mathbf{u}$
-     */
-    template <int dim>
-    class NewtonStokesReferenceDensityCompressibilityTerm : public Assemblers::Interface<dim>,
-      public SimulatorAccess<dim>
-    {
-      public:
-        void
-        execute(internal::Assembly::Scratch::ScratchBase<dim>  &scratch_base,
-                internal::Assembly::CopyData::CopyDataBase<dim> &data_base) const override;
-    };
-
-    /**
-     * This class assembles the compressibility term of the Newton Stokes system
-     * that is caused by the compressibility in the mass conservation equation.
-     * It includes this term implicitly in the matrix,
-     * which is therefore not longer symmetric.
-     * This function approximates this term as
-     * $ - \nabla \mathbf{u} - \frac{1}{\rho} \frac{\partial rho}{\partial z} \frac{\mathbf{g}}{||\mathbf{g}||} \cdot \mathbf{u} = 0$
-     */
-    template <int dim>
-    class NewtonStokesImplicitReferenceDensityCompressibilityTerm : public Assemblers::Interface<dim>,
-      public SimulatorAccess<dim>
-    {
-      public:
-        void
-        execute(internal::Assembly::Scratch::ScratchBase<dim>  &scratch_base,
-                internal::Assembly::CopyData::CopyDataBase<dim> &data_base) const override;
-    };
-
-    /**
-     * This class assembles the right-hand-side term of the Newton Stokes system
-     * that is caused by the compressibility in the mass conservation equation.
-     * This function approximates this term as
-     * $ - \nabla \mathbf{u} = \frac{1}{\rho} \frac{\partial rho}{\partial p} \rho \mathbf{g} \cdot \mathbf{u}$
-     */
-    template <int dim>
-    class NewtonStokesIsentropicCompressionTerm : public Assemblers::Interface<dim>,
-      public SimulatorAccess<dim>
-    {
-      public:
-        void
-        execute(internal::Assembly::Scratch::ScratchBase<dim>  &scratch_base,
-                internal::Assembly::CopyData::CopyDataBase<dim> &data_base) const override;
-    };
-
-    /**
-     * This class assembles the right-hand-side term of the Stokes equation
-     * that is caused by the variable density in the mass conservation equation.
-     * This class approximates this term as
-     * $ - \nabla \cdot \mathbf{u} = \frac{1}{\rho} \frac{\partial \rho}{\partial t} + \frac{1}{\rho} \nabla \rho \cdot \mathbf{u}$
-     * where the right-hand side velocity is explicitly taken from the last timestep,
-     * and the density is taken from a compositional field of the type 'density'.
-     */
-    template <int dim>
-    class NewtonStokesProjectedDensityFieldTerm : public Assemblers::Interface<dim>,
-      public SimulatorAccess<dim>
-    {
-      public:
-        void
-        execute(internal::Assembly::Scratch::ScratchBase<dim>   &scratch,
-                internal::Assembly::CopyData::CopyDataBase<dim> &data) const override;
     };
   }
 }

@@ -168,26 +168,21 @@ namespace aspect
         || timestep == 0.0)
         return;
 
-        SUNDIALS::ARKode<VectorType>::AdditionalData data;
-
-        data.initial_time = 0.0;
-        data.final_time = this->get_timestep();
-
-        data.initial_step_size = arkode_initial_step_size * this->get_timestep();
-        data.output_period = this->get_timestep();
-        data.minimum_step_size = arkode_minimum_step_size * this->get_timestep();
-        data.maximum_order = 3;
-        data.maximum_non_linear_iterations = 30;
+        SUNDIALS::ARKode<VectorType>::AdditionalData ode_data;
+        ode_data.initial_time = 0.0;
+        ode_data.final_time = this->get_timestep();
+        ode_data.initial_step_size = arkode_initial_step_size * this->get_timestep();
+        ode_data.output_period = this->get_timestep();
+        ode_data.minimum_step_size = arkode_minimum_step_size * this->get_timestep();
 
         // Because both tolerances are added, we set the absolute
         // tolerance to 0.
-        data.relative_tolerance = 1e-3;
-        data.absolute_tolerance = 0;
+        ode_data.relative_tolerance = 1e-3;
+        ode_data.absolute_tolerance = 0;
 
-        SUNDIALS::ARKode<VectorType> ode(data);
-        ode.explicit_function = [&] (const double     /*time*/,
-                                     const VectorType &y,
-                                     VectorType       &grain_size_rates_of_change)
+        const auto explicit_function = [&] (const double     /*time*/,
+                                            const VectorType &y,
+                                            VectorType       &grain_size_rates_of_change)
         {
           for (unsigned int i=0; i<n_evaluation_points; ++i)
             {
@@ -226,8 +221,8 @@ namespace aspect
                                           std::pow(roughness_to_grain_size, m);
 
               // grain size reduction in dislocation creep regime
-              const SymmetricTensor<2,dim> shear_strain_rate = in.strain_rate[i] - 1./dim * trace(in.strain_rate[i]) * unit_symmetric_tensor<dim>();
-              const double second_strain_rate_invariant = std::sqrt(std::max(-second_invariant(shear_strain_rate), 0.));
+              const SymmetricTensor<2,dim> shear_strain_rate = Utilities::Tensors::consistent_deviator(in.strain_rate[i]);
+              const double second_strain_rate_invariant = std::sqrt(std::max(-Utilities::Tensors::consistent_second_invariant_of_deviatoric_tensor(shear_strain_rate), 0.));
 
               const double current_diffusion_viscosity   = diffusion_viscosity(in.temperature[i], adiabatic_temperature, pressures[i], grain_size, second_strain_rate_invariant, phase_indices[i]);
               current_dislocation_viscosity = dislocation_viscosity(in.temperature[i], adiabatic_temperature, pressures[i], in.strain_rate[i], phase_indices[i], current_diffusion_viscosity, current_dislocation_viscosity);
@@ -270,6 +265,20 @@ namespace aspect
             }
         };
 
+#if DEAL_II_VERSION_GTE(9,8,0)
+        SUNDIALS::ARKStepper<VectorType>::AdditionalData stepper_data;
+        stepper_data.order = 3;
+        stepper_data.maximum_non_linear_iterations = 30;
+
+        SUNDIALS::ARKStepper<VectorType> stepper(stepper_data);
+        stepper.explicit_function = explicit_function;
+        SUNDIALS::ARKode<VectorType> ode(stepper, ode_data);
+#else
+        ode_data.maximum_order = 3;
+        ode_data.maximum_non_linear_iterations = 30;
+        SUNDIALS::ARKode<VectorType> ode(ode_data);
+        ode.explicit_function = explicit_function;
+#endif
 
         const unsigned int iteration_count = ode.solve_ode(grain_sizes);
         this->get_signals().post_ARKode_solve(*this, iteration_count);

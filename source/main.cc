@@ -57,18 +57,9 @@
 
 #include <catch.hpp>
 
-#ifdef ASPECT_WITH_PYTHON
-// Python does not like it if this macro is already defined. This happens at
-// least in some versions of Trilinos and can trigger only with certain unity
-// build options:
-#ifdef HAVE_SYS_TIME_H
-#  undef HAVE_SYS_TIME_H
-#endif
-#  define PY_SSIZE_T_CLEAN
-#  include <Python.h>
-#  define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#  include <numpy/arrayobject.h>
-#endif
+
+#define ASPECT_NUMPY_DEFINE_API
+#include <aspect/python_helper.h>
 
 namespace
 {
@@ -405,7 +396,7 @@ namespace
           {
             std::cerr << "***          You should not take everything literally!          ***\n"
                       << "*** Please pass the name of an existing parameter file instead. ***" << std::endl;
-            exit(1);
+            std::exit(1);
           }
 
         input_as_string = aspect::Utilities::read_and_distribute_file_content(parameter_file_name, comm);
@@ -782,9 +773,12 @@ int main (int argc, char *argv[])
 
 #ifdef ASPECT_WITH_PYTHON
   Py_Initialize();
-  // required for Numpy interop
+  // Required for Numpy interop:
   if (_import_array() < 0)
-    AssertThrow(false, ExcMessage("Numpy init failed!"));
+    {
+      PyErr_Print();
+      AssertThrow(false, ExcMessage("Numpy init failed!"));
+    }
 
   ScopeExit python_cleanup(
     []()

@@ -21,6 +21,7 @@
 
 #include <aspect/simulator.h>
 #include <aspect/global.h>
+#include <aspect/linear_algebra_types.h>
 #include <aspect/utilities.h>
 #include <aspect/melt.h>
 #include <aspect/advection_field.h>
@@ -67,6 +68,7 @@
 #endif
 #include <deal.II/distributed/grid_refinement.h>
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <locale>
@@ -234,6 +236,7 @@ namespace aspect
     timestep_number (numbers::invalid_unsigned_int),
     nonlinear_iteration (numbers::invalid_unsigned_int),
     nonlinear_solver_failures (0),
+    linear_solver_failures (0),
 
     triangulation (mpi_communicator, smoothing_flags<dim>(parameters.stokes_gmg_type == Parameters<dim>::StokesGMGType::global_coarsening), settings(parameters)),
 
@@ -471,7 +474,15 @@ namespace aspect
     postprocess_manager.initialize_simulator (*this);
     postprocess_manager.parse_parameters (prm);
 
-    if (postprocess_manager.template has_matching_active_plugin<Postprocess::Particles<dim>>())
+    const bool particles_are_needed =
+      postprocess_manager.template has_matching_active_plugin<Postprocess::Particles<dim>>()
+      ||
+      (std::find (parameters.compositional_field_methods.begin(),
+                  parameters.compositional_field_methods.end(),
+                  Parameters<dim>::AdvectionFieldMethod::particles)
+       != parameters.compositional_field_methods.end());
+
+    if (particles_are_needed)
       {
         particle_managers.resize(parameters.n_particle_managers);
 
@@ -1107,13 +1118,9 @@ namespace aspect
     system_matrix.clear ();
 
     const Table<2,DoFTools::Coupling> coupling = setup_system_matrix_coupling();
-    LinearAlgebra::BlockDynamicSparsityPattern sp;
 
-    sp.reinit (system_partitioning,
-               system_partitioning,
-               introspection.index_sets.system_relevant_partitioning,
-               mpi_communicator);
-
+    const auto &system_relevant_partitioning = introspection.index_sets.system_relevant_partitioning;
+    LinearAlgebra::BlockDynamicSparsityPattern dsp(system_relevant_partitioning);
 
     if ((parameters.use_discontinuous_temperature_discretization) ||
         (parameters.have_discontinuous_composition_discretization) ||
@@ -1154,8 +1161,9 @@ namespace aspect
           }
 
         DoFTools::make_flux_sparsity_pattern (dof_handler,
-                                              sp,
-                                              current_constraints, false,
+                                              dsp,
+                                              current_constraints,
+                                              false,
                                               coupling,
                                               face_coupling,
                                               Utilities::MPI::
@@ -1178,11 +1186,12 @@ namespace aspect
                 composition_coupling[component][component] = coupling[component][component];
 
                 const unsigned int block = introspection.block_indices.compositional_field_sparsity_pattern[first_c];
-                sp.block(block,block).reinit(sp.block(block,block).locally_owned_range_indices(),
-                                             sp.block(block,block).locally_owned_domain_indices());
+                dsp.block(block,block).reinit(system_relevant_partitioning[block].size(),
+                                              system_relevant_partitioning[block].size(),
+                                              system_relevant_partitioning[block]);
 
                 DoFTools::make_flux_sparsity_pattern (dof_handler,
-                                                      sp,
+                                                      dsp,
                                                       current_constraints, true,
                                                       composition_coupling,
                                                       face_coupling,
@@ -1194,8 +1203,10 @@ namespace aspect
     else
       {
         DoFTools::make_sparsity_pattern (dof_handler,
-                                         coupling, sp,
-                                         current_constraints, false,
+                                         coupling,
+                                         dsp,
+                                         current_constraints,
+                                         false,
                                          Utilities::MPI::
                                          this_mpi_process(mpi_communicator));
 
@@ -1215,18 +1226,19 @@ namespace aspect
             composition_coupling[component][component] = coupling[component][component];
 
             const unsigned int block = introspection.get_components_to_blocks()[component];
-            sp.block(block,block).reinit(sp.block(block,block).locally_owned_range_indices(),
-                                         sp.block(block,block).locally_owned_domain_indices());
+            dsp.block(block,block).reinit(system_relevant_partitioning[block].size(),
+                                          system_relevant_partitioning[block].size(),
+                                          system_relevant_partitioning[block]);
 
             DoFTools::make_sparsity_pattern (dof_handler,
-                                             composition_coupling, sp,
-                                             current_constraints, true,
+                                             composition_coupling,
+                                             dsp,
+                                             current_constraints,
+                                             true,
                                              Utilities::MPI::
                                              this_mpi_process(mpi_communicator));
           }
       }
-
-    sp.compress();
 
     // We may only allocate some of the matrix blocks, but the sparsity pattern
     // will still create entries for hanging nodes and boundary conditions.
@@ -1244,16 +1256,18 @@ namespace aspect
               continue;
 
             const unsigned int block = introspection.get_components_to_blocks()[i];
-
-            // TODO: using clear() would be nice here but clear() also resets the
-            // size, so just reinit():
-            sp.block(block,block).reinit(sp.block(block,block).locally_owned_range_indices(),
-                                         sp.block(block,block).locally_owned_domain_indices());
-            sp.block(block,block).compress();
+            dsp.block(block,block).reinit(system_relevant_partitioning[block].size(),
+                                          system_relevant_partitioning[block].size(),
+                                          system_relevant_partitioning[block]);
           }
       }
 
-    system_matrix.reinit (sp);
+    SparsityTools::distribute_sparsity_pattern(dsp,
+                                               dof_handler.locally_owned_dofs(),
+                                               mpi_communicator,
+                                               introspection.index_sets.system_relevant_set);
+
+    system_matrix.reinit (system_partitioning, dsp, mpi_communicator);
   }
 
 
@@ -1323,21 +1337,15 @@ namespace aspect
     // its sparsity pattern here -- the corresponding entries of
     // 'coupling' simply remain at DoFTools::none
 
-    LinearAlgebra::BlockDynamicSparsityPattern sp;
-
-    sp.reinit (system_partitioning,
-               system_partitioning,
-               introspection.index_sets.system_relevant_partitioning,
-               mpi_communicator);
+    LinearAlgebra::BlockDynamicSparsityPattern dsp(introspection.index_sets.system_relevant_partitioning);
 
     DoFTools::make_sparsity_pattern (dof_handler,
-                                     coupling, sp,
-                                     current_constraints, false,
+                                     coupling,
+                                     dsp,
+                                     current_constraints,
+                                     false,
                                      Utilities::MPI::
                                      this_mpi_process(mpi_communicator));
-
-
-    sp.compress();
 
     // We are not interested in temperature and composition matrices for the
     // preconditioner matrix. But even though we specify a coupling of
@@ -1346,25 +1354,27 @@ namespace aspect
     // unnecessary, so we remove those entries here.
     {
       // temperature:
-      const unsigned int block_idx = introspection.block_indices.temperature;
-      // TODO: using clear() would be nice here but clear() also resets the
-      // size, so just reinit():
-      sp.block(block_idx, block_idx).reinit(sp.block(block_idx, block_idx).locally_owned_range_indices(),
-                                            sp.block(block_idx, block_idx).locally_owned_domain_indices());
-      sp.block(block_idx, block_idx).compress();
+      const unsigned int block = introspection.block_indices.temperature;
+      dsp.block(block,block).reinit(system_partitioning[block].size(),
+                                    system_partitioning[block].size(),
+                                    system_partitioning[block]);
     }
     // compositions:
     for (unsigned int c=0; c<introspection.n_compositional_fields; ++c)
       {
-        const unsigned int block_idx = introspection.block_indices.compositional_fields[c];
-        // TODO: using clear() would be nice here but clear() also resets the
-        // size, so just reinit():
-        sp.block(block_idx, block_idx).reinit(sp.block(block_idx, block_idx).locally_owned_range_indices(),
-                                              sp.block(block_idx, block_idx).locally_owned_domain_indices());
-        sp.block(block_idx, block_idx).compress();
+        const unsigned int block = introspection.block_indices.compositional_fields[c];
+        dsp.block(block,block).reinit(system_partitioning[block].size(),
+                                      system_partitioning[block].size(),
+                                      system_partitioning[block]);
       }
 
-    system_preconditioner_matrix.reinit (sp);
+    SparsityTools::distribute_sparsity_pattern(dsp,
+                                               dof_handler.locally_owned_dofs(),
+                                               mpi_communicator,
+                                               introspection.index_sets.system_relevant_set);
+
+    system_preconditioner_matrix.reinit (system_partitioning, dsp, mpi_communicator);
+
     if (parameters.use_bfbt)
       inverse_lumped_mass_matrix.reinit(introspection.index_sets.stokes_partitioning);
   }
@@ -1383,7 +1393,6 @@ namespace aspect
     // addition, we may be computing constraints from boundary values for the
     // velocity that are different between time steps. these are then put
     // into current_constraints in start_timestep().
-    signals.pre_compute_no_normal_flux_constraints(triangulation);
     {
       // do the interpolation for zero velocity
       for (const auto p : boundary_velocity_manager.get_zero_boundary_velocity_indicators())
@@ -1394,18 +1403,27 @@ namespace aspect
                                                   constraints,
                                                   introspection.component_masks.velocities);
 
+      // Precompute no-normal-flux constraints for all boundaries that are not deforming.
+      // All other boundaries are handled in compute_current_velocity_boundary_constraints() below.
+      const auto &unmoving_tangential_velocity_boundaries = (parameters.mesh_deformation_enabled
+                                                             ?
+                                                             mesh_deformation->get_tangential_velocity_without_active_mesh_deformation_boundary_indicators()
+                                                             :
+                                                             boundary_velocity_manager.get_tangential_boundary_velocity_indicators());
 
-      // do the same for no-normal-flux boundaries
-      VectorTools::compute_no_normal_flux_constraints (dof_handler,
-                                                       /* first_vector_component= */
-                                                       introspection.component_indices.velocities[0],
-                                                       boundary_velocity_manager.get_tangential_boundary_velocity_indicators(),
-                                                       constraints,
-                                                       *mapping);
+      signals.pre_compute_no_normal_flux_constraints(triangulation);
+      VectorTools::compute_no_normal_flux_constraints(dof_handler,
+                                                      /* first_vector_component= */
+                                                      introspection.component_indices.velocities[0],
+                                                      unmoving_tangential_velocity_boundaries,
+                                                      constraints,
+                                                      *mapping,
+                                                      /* use_manifold_for_normal= */
+                                                      true);
     }
-
-
   }
+
+
 
   template <int dim>
   void
@@ -1415,7 +1433,25 @@ namespace aspect
     // for the prescribed velocity fields
     boundary_velocity_manager.update();
 
-    // put boundary conditions into constraints object for each boundary
+    // If mesh deformation is enabled, we need to recompute no-normal-flux
+    // constraints on deforming boundaries, because the normal vector changes.
+    // We also cannot use the manifold for the normal vector because the
+    // manifold may not represent the actual geometry.
+    if (parameters.mesh_deformation_enabled == true)
+      {
+        signals.pre_compute_no_normal_flux_constraints(triangulation);
+
+        VectorTools::compute_no_normal_flux_constraints (dof_handler,
+                                                         /* first_vector_component= */
+                                                         introspection.component_indices.velocities[0],
+                                                         mesh_deformation->get_tangential_velocity_with_active_mesh_deformation_boundary_indicators(),
+                                                         constraints,
+                                                         *mapping,
+                                                         /*use_manifold_for_normal=*/
+                                                         false);
+      }
+
+    // Compute constraints for prescribed velocity boundaries for each boundary
     for (const auto boundary_id: boundary_velocity_manager.get_prescribed_boundary_velocity_indicators())
       {
         Utilities::VectorFunctionFromVelocityFunctionObject<dim> vel
@@ -1919,6 +1955,29 @@ namespace aspect
 
         // calculate global volume after deforming mesh
         global_volume = GridTools::volume (triangulation, *mapping);
+
+        // since the mesh has changed, boundary conditions may have changed as well
+        // so we need to recompute the current constraints
+        compute_current_constraints ();
+
+        // GMG boundary conditions are currently handled as part of setup_dofs()
+        if (stokes_matrix_free)
+          stokes_matrix_free->setup_dofs();
+
+        // if compute_current_constraints() changed which DoFs are constrained,
+        // we need to rebuild the system matrices
+        if (rebuild_sparsity_and_matrices)
+          {
+            computing_timer.enter_subsection("Setup matrices");
+
+            rebuild_sparsity_and_matrices = false;
+            setup_system_matrix (introspection.index_sets.system_partitioning);
+            setup_system_preconditioner (introspection.index_sets.system_partitioning);
+            rebuild_stokes_matrix = rebuild_stokes_preconditioner = true;
+
+            computing_timer.leave_subsection("Setup matrices");
+          }
+
         signals.post_mesh_deformation(*this);
       }
 
@@ -2088,9 +2147,9 @@ namespace aspect
     // start-up
     if (parameters.resume_computation == true)
       {
-        last_checkpoint_id = determine_last_good_snapshot();
+        last_checkpoint_id = determine_resume_snapshot();
         AssertThrow(last_checkpoint_id != numbers::invalid_unsigned_int,
-                    ExcMessage("You requested to restart the simulation from the last checkpoint but no written checkpoint has been found."));
+                    ExcMessage("You requested to restart the simulation from a checkpoint, but no matching written checkpoint has been found."));
 
         resume_from_snapshot();
         // we need to remove additional_refinement_times that are in the past
@@ -2276,6 +2335,9 @@ namespace aspect
     // we disable automatic summary printing so that it won't happen when
     // throwing an exception. Therefore, we have to do this manually here:
     computing_timer.print_summary ();
+
+    if (linear_solver_failures > 0)
+      pcout << "\nWARNING: During this computation " << linear_solver_failures << " linear solver failures occurred!" << std::endl;
 
     if (nonlinear_solver_failures > 0)
       pcout << "\nWARNING: During this computation " << nonlinear_solver_failures << " nonlinear solver failures occurred!" << std::endl;
