@@ -486,6 +486,11 @@ namespace aspect
 
               out.viscosities[q] = scalar_viscosity;
 
+              // if (not std::isfinite(out.viscosities[q])) 
+              //   {
+              //     printf("%f",scalar_viscosity); 
+              //   }
+                
               AssertThrow(std::isfinite(out.viscosities[q]),
                           ExcMessage("Viscosity should be finite"));
               AssertThrow(out.viscosities[q] > 0,

@@ -33,16 +33,21 @@ subsection Geometry model
     set X extent = 1
     #set Y extent = 0.0625 #0.03125 #  #  #  
     set Y extent = 1
-    set X repetitions = 16 # 32  
+    set X repetitions = 1 # 32  
     #set Y repetitions = 1
-    set Y repetitions = 16 # 32 #  
+    set Y repetitions = 1 # 32 #  
   end
 end
 
 subsection Mesh refinement
-  set Initial global refinement           = 0
+  set Initial global refinement           = 4
+  #set Additional refinement times         = 0.001
   set Initial adaptive refinement         = 0
-  set Time steps between mesh refinement  = 0
+  set Time steps between mesh refinement  = 0 #5
+  #set Coarsening fraction = 0.01
+  #set Refinement fraction = 0.6
+  #set Minimum refinement level = 4
+  #set Strategy = composition gradient, boundary, temperature
 end 
 
 # We prescribe a linear temperature profile that
@@ -205,7 +210,7 @@ end
 subsection Particles
   set List of particle properties = integrated strain invariant, crystal preferred orientation, cpo bingham average
   set Allow cells without particles = true
-  set Interpolation scheme =  cell average 
+  set Interpolation scheme =   quadratic least squares # cell average 
   set Particle generator name =  random uniform
   set Minimum particles per cell  = 16
   set Maximum particles per cell  = 17
