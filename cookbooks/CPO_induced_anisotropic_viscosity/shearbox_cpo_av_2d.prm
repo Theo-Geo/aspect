@@ -10,9 +10,9 @@ set Dimension                    = 2
 set Pressure normalization       = surface
 set Surface pressure             = 0
 set Nonlinear solver scheme      = single Advection, single Stokes
-set End time                     = 0.1
+set End time                     = 1
 set Use years instead of seconds = false
-set Output directory             = output_Shearbox_CPO_AV_2d_iso
+set Output directory             = output_Shearbox_CPO_AV_2d
 
 subsection Initial composition model
   set List of model names = function
@@ -34,24 +34,26 @@ subsection Compositional fields
                         phi2, eigvalue_c1, eigvalue_c2, eigvalue_c3,\
                         water
   set Compositional field methods = prescribed field, \
-                                    static, static, static, static, \
-                                    static, static, static, static, \
-                                    static, static, static, static, \
+                                    particles, particles, particles, particles, \
+                                    particles, particles, particles, particles, \
+                                    particles, particles, particles, particles, \
                                     static
-                                  
-                                    # particles, particles, particles, particles, \
-                                    # particles, particles, particles, particles, \
-                                    # particles, particles, particles, particles, \
                                     
-  # set Mapped particle properties = phi1:cpo mineral 0 phi1[0], eigvalue_a1:cpo mineral 0 eigenvalues a axis[0], eigvalue_a2:cpo mineral 0 eigenvalues a axis[1], eigvalue_a3:cpo mineral 0 eigenvalues a axis[2], \
-  #                                  theta:cpo mineral 0 theta[0], eigvalue_b1:cpo mineral 0 eigenvalues b axis[0], eigvalue_b2:cpo mineral 0 eigenvalues b axis[1], eigvalue_b3:cpo mineral 0 eigenvalues b axis[2], \
-  #                                  phi2:cpo mineral 0 phi2[0], eigvalue_c1:cpo mineral 0 eigenvalues c axis[0], eigvalue_c2:cpo mineral 0 eigenvalues c axis[1], eigvalue_c3:cpo mineral 0 eigenvalues c axis[2]
+  set Mapped particle properties = phi1:cpo mineral 0 phi1[0], eigvalue_a1:cpo mineral 0 eigenvalues a axis[0], eigvalue_a2:cpo mineral 0 eigenvalues a axis[1], eigvalue_a3:cpo mineral 0 eigenvalues a axis[2], \
+                                   theta:cpo mineral 0 theta[0], eigvalue_b1:cpo mineral 0 eigenvalues b axis[0], eigvalue_b2:cpo mineral 0 eigenvalues b axis[1], eigvalue_b3:cpo mineral 0 eigenvalues b axis[2], \
+                                   phi2:cpo mineral 0 phi2[0], eigvalue_c1:cpo mineral 0 eigenvalues c axis[0], eigvalue_c2:cpo mineral 0 eigenvalues c axis[1], eigvalue_c3:cpo mineral 0 eigenvalues c axis[2]
   set Types of fields = generic, \
                         generic, generic, generic, generic, \
                         generic, generic, generic, generic, \
                         generic, generic, generic, generic, \
                         generic
 end
+
+# use static fields for the isotropic case 
+  # static, static, static, static, \
+  # static, static, static, static, \
+  # static, static, static, static, \
+  
 
 subsection Gravity model
   set Model name = vertical
@@ -106,6 +108,7 @@ subsection Material model
 
   subsection CPO-induced Anisotropic Viscosity
     set Reference viscosity = 1e9
+    set Use analytical inversion = true
   end
 end
 
