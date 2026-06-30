@@ -148,36 +148,10 @@ namespace aspect
     // }
 
     template<int dim>
-    SymmetricTensor<2,6>
-    CPO_AV_3D<dim>::viscosity_tensor_cpo_frame( const double F, const double G, const double H,
-                                                const double L, const double M, const double N) const
-    {
-      std::vector<int> ji = {1,2,0}; // tuple of indices shifted by one 
-      std::vector<int> ki = {2,0,1}; // tuple of indices shifted by two
-
-      SymmetricTensor<2,6> visc_tensor; 
-      std::vector<double> Hi = {F, G, H, M, N, L};
-      
-      const double gamma = 4*(Hi[2]*Hi[1] + Hi[0]*Hi[2] + Hi[0]*Hi[1]); 
-      
-      for (unsigned int i=0; i < 3; ++i)
-        {
-          // upper left part
-          visc_tensor[i][i] = 2/(3*gamma)*(4*Hi[i] + Hi[ji[i]] + Hi[ki[i]]);
-          visc_tensor[ji[i]][ki[i]] = 2/(3*gamma)*(Hi[i] - 2*Hi[ji[i]] - 2*Hi[ki[i]]);
-          // sym: visc_tensor[ki[i]][ji[i]] = visc_tensor[ji[i]][ki[i]];
-
-          // lower right part 
-          visc_tensor[i+3][i+3] = 3/(2*Hi[i+3]);
-        }
-      return visc_tensor; 
-    }
-
-    template<int dim>
     SymmetricTensor<4,dim>
-    CPO_AV_3D<dim>::Kelvin_to_r4_tensor(const Tensor<2,6> V) const
+    CPO_AV_3D<dim>::kelvin_to_r4_tensor(const Tensor<2,6> V) const
     {
-      // Converts rank 2 viscosity tensor to full rank 4 necessary in the assembler 
+      // Converts rank 2 kelvin notation viscosity tensor to full rank 4 tensor necessary in the assembler
       // recast into FullMatrix type with shape 6x6 for 3d or 3x3 for 2d applications
       FullMatrix<double> V_mat((dim==3) ? 6 : 3 , (dim==3) ? 6 : 3);
       if (dim == 3)
@@ -188,7 +162,7 @@ namespace aspect
                 {
                   V_mat[vi][vj] = V[vi][vj];
                 }
-            }          
+            }
         }
       else // (dim == 2) // discard out of plane components
         {
@@ -198,9 +172,9 @@ namespace aspect
                 {
                   V_mat[vi][vj] = V[((vi == 2) ? 5 : vi)][((vj == 2) ? 5 : vj)];
                 }
-            }        
+            }
         }
-      
+
       SymmetricTensor<4,dim> V_r4;
       dealii::Physics::Notation::Kelvin::to_tensor(V_mat, V_r4);
       return V_r4;
@@ -208,53 +182,79 @@ namespace aspect
 
 
     template<int dim>
+    SymmetricTensor<2,6>
+    CPO_AV_3D<dim>::viscosity_tensor_cpo_frame( const double F, const double G, const double H,
+                                                const double L, const double M, const double N) const
+    {
+      std::vector<int> ji = {1,2,0}; // tuple of indices shifted by one
+      std::vector<int> ki = {2,0,1}; // tuple of indices shifted by two
+
+      SymmetricTensor<2,6> visc_tensor;
+      std::vector<double> Hi = {F, G, H, M, N, L};
+
+      const double gam = 4*(Hi[2]*Hi[1] + Hi[0]*Hi[2] + Hi[0]*Hi[1]);
+
+      for (unsigned int i=0; i < 3; ++i)
+        {
+          // upper left part
+          visc_tensor[i][i] = 2/(3*gam)*(4*Hi[i] + Hi[ji[i]] + Hi[ki[i]]);
+          visc_tensor[ji[i]][ki[i]] = 2/(3*gam)*(Hi[i] - 2*Hi[ji[i]] - 2*Hi[ki[i]]);
+          // sym: visc_tensor[ki[i]][ji[i]] = visc_tensor[ji[i]][ki[i]];
+
+          // lower right part
+          visc_tensor[i+3][i+3] = 3/(2*Hi[i+3]);
+        }
+      return visc_tensor;
+    }
+
+    template<int dim>
     double
     CPO_AV_3D<dim>::orthotropic_strain_rate_invariant(const Tensor<2,3> strain_rate_cpo_frame,
-                                      const double F, const double G, const double H,
-                                      const double L, const double M, const double N) const
+                                                      const double F, const double G, const double H,
+                                                      const double L, const double M, const double N) const
     {
-      // similar
+      // based on rathmann 2021 (https://doi.org/10.1017/jog.2022.33)
+      // formulated in terms of Hill coefficients
 
-      std::vector<int> ji = {1,2,0}; // tuple of indices shifted by one 
+      std::vector<int> ji = {1,2,0}; // tuple of indices shifted by one
       std::vector<int> ki = {2,0,1}; // tuple of indices shifted by two
 
       std::vector<double> Hi = {F, G, H, M, N, L};
-      const double gamma = 4*(Hi[2]*Hi[1] + Hi[0]*Hi[2] + Hi[0]*Hi[1]);
+      const double gam = 4*(Hi[2]*Hi[1] + Hi[0]*Hi[2] + Hi[0]*Hi[1]);
 
       double anisotropic_invariant = 0.0;
 
       for (unsigned int i=0; i < 3; ++i)
         {
-          anisotropic_invariant += ( 2/(3*gamma)*Utilities::fixed_power<2>(strain_rate_cpo_frame[i][i])*(
-                                    4*Hi[i]+Hi[ji[i]]+Hi[ki[i]]) 
-                                + 2/(3*gamma)*2*strain_rate_cpo_frame[ji[i]][ji[i]]*strain_rate_cpo_frame[ki[i]][ki[i]]*(
-                                    Hi[i] - 2*Hi[ji[i]] - 2*Hi[ki[i]])
-                                + 3/Hi[i+3]*Utilities::fixed_power<2>(strain_rate_cpo_frame[ji[i]][ki[i]]) 
-                                );
+          anisotropic_invariant += ( 2/(3*gam)*Utilities::fixed_power<2>(strain_rate_cpo_frame[i][i])*(
+                                       4*Hi[i]+Hi[ji[i]]+Hi[ki[i]])
+                                     + 2/(3*gam)*2*strain_rate_cpo_frame[ji[i]][ji[i]]*strain_rate_cpo_frame[ki[i]][ki[i]]*(
+                                       Hi[i] - 2*Hi[ji[i]] - 2*Hi[ki[i]])
+                                     + 3/Hi[i+3]*Utilities::fixed_power<2>(strain_rate_cpo_frame[ji[i]][ki[i]])
+                                   );
         }
 
-      return std::pow(anisotropic_invariant, 0.5);  
+      return std::pow(anisotropic_invariant, 0.5);
     }
-    
-    
+
+
     template <int dim>
     void
     CPO_AV_3D<dim>::evaluate (const MaterialModel::MaterialModelInputs<dim> &in,
-                            MaterialModel::MaterialModelOutputs<dim> &out) const
+                              MaterialModel::MaterialModelOutputs<dim> &out) const
     {
-    // const int dim=3;
-    const std::shared_ptr<MaterialModel::AnisotropicViscosity<dim>> anisotropic_viscosity = out.template get_additional_output_object<MaterialModel::AnisotropicViscosity<dim>>();
-    
+      const std::shared_ptr<MaterialModel::AnisotropicViscosity<dim>> anisotropic_viscosity = out.template get_additional_output_object<MaterialModel::AnisotropicViscosity<dim>>();
+
       EquationOfStateOutputs<dim> eos_outputs (1);
       const unsigned int viscosity_field_index = this->introspection().compositional_index_for_name("scalar_viscosity");
 
-      const double n = stress_exponent; //1
+      const double n = stress_exponent;
 
       for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
         {
           equation_of_state.evaluate(in, q, eos_outputs);
 
-          // Get parameters for compute the effective viscosity
+          // Get parameters for effective viscosity
           out.densities[q] = eos_outputs.densities[0];
           out.viscosities[q] = eta;
           out.thermal_expansion_coefficients[q] = eos_outputs.thermal_expansion_coefficients[0];
@@ -379,12 +379,12 @@ namespace aspect
                   // rotate 3d strain-rate into cpo frame and compute scalar anisotropic viscosity
                   Tensor<2,3> strain_rate_cpo = R*strain_rate_3d*transpose(R);
                   scalar_viscosity =  std::pow(Gamma,(-1/n))*std::pow(CPO_AV_3D::orthotropic_strain_rate_invariant(strain_rate_cpo, F,G,H, M,N,L), ((1-n)/n) );
-                  
-                  // calculate the anisotropic tensor for viscosity in CPO frame and rotate into model frame 
+
+                  // calculate the anisotropic tensor for viscosity in CPO frame and rotate into model frame
                   const Tensor<2,6> viscosity_tensor = transpose(R_CPO_K) * CPO_AV_3D::viscosity_tensor_cpo_frame(F,G,H, M,N,L) * R_CPO_K;
 
-                  // save viscosity tensor in stress-strain director to be used in 
-                  anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::Kelvin_to_r4_tensor(viscosity_tensor);
+                  // save viscosity tensor in stress-strain director to be used in
+                  anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::kelvin_to_r4_tensor(viscosity_tensor);
                 }
               else // using the iterative inversion based on a pseudo inverse of the anisotropic tensor for fluidity
                 {
@@ -422,9 +422,9 @@ namespace aspect
 
                   // Calculate the viscosity tensor in the CPO frame
                   const Tensor<2,6> viscosity_tensor = transpose(R_CPO_K) * invA * R_CPO_K;
-                  
-                  // save 2D (3D) viscosity tensor in stress strain-director 
-                  anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::Kelvin_to_r4_tensor(viscosity_tensor);
+
+                  // save 2D (3D) viscosity tensor in stress strain-director
+                  anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::kelvin_to_r4_tensor(viscosity_tensor);
 
                   // Convert rank 2 viscosity tensor to rank 4 necessary for iterative inversion
                   FullMatrix<double> viscosity_mat(6,6);
@@ -435,20 +435,20 @@ namespace aspect
                           viscosity_mat[vi][vj] = viscosity_tensor[vi][vj];
                         }
                     }
-                  
+
                   // 3d viscosity tensor not always passed on to assembler
-                  SymmetricTensor<4,3> viscosity_tensor_3D_r4; 
+                  SymmetricTensor<4,3> viscosity_tensor_3D_r4;
                   dealii::Physics::Notation::Kelvin::to_tensor(viscosity_mat, viscosity_tensor_3D_r4);
 
-                  // calculating anisotropic scalar viscosity from iterative inversion 
+                  // calculating anisotropic scalar viscosity from iterative inversion
 
                   // In the first time step using the actual strain rate can lead to convergence issue if the strain rate varies significantly within the model domain.
                   // Thus for the first timestep we calculate an initial viscosity based on the strain rate.
                   if (this->get_timestep_number() == 1)
                     {
                       double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
-                                                    min_strain_rate);
-                      scalar_viscosity= 1/Gamma*std::pow(edot_ii,((1. - n)/n));
+                                              min_strain_rate);
+                      scalar_viscosity= std::pow(Gamma,-1/n)*std::pow(edot_ii,((1. - n)/n));
                     }
 
                   unsigned int n_iterations = 0;
@@ -482,15 +482,15 @@ namespace aspect
                       threshold = 0.0001*scalar_viscosity;
                       n_iterations++;
                     }
-              }
+                }
 
               out.viscosities[q] = scalar_viscosity;
 
-              // if (not std::isfinite(out.viscosities[q])) 
+              // if (not std::isfinite(out.viscosities[q]))
               //   {
-              //     printf("%f",scalar_viscosity); 
+              //     printf("%f",scalar_viscosity);
               //   }
-                
+
               AssertThrow(std::isfinite(out.viscosities[q]),
                           ExcMessage("Viscosity should be finite"));
               AssertThrow(out.viscosities[q] > 0,
@@ -503,8 +503,8 @@ namespace aspect
                 {
                   // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
                   double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
-                                                min_strain_rate);
-                  out.viscosities[q] = 1/Gamma*std::pow(edot_ii,((1. - n)/n)); // 
+                                          min_strain_rate);
+                  out.viscosities[q] = std::pow(Gamma, (-1/n))*std::pow(edot_ii,((1. - n)/n)); //
 
                 }
 
@@ -522,9 +522,9 @@ namespace aspect
                   viscosity_tensor[4][4] = 1.0;
                   viscosity_tensor[5][5] = 1.0;
 
-                  // save viscosity tensor in stress-strain director to be used in 
-                  anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::Kelvin_to_r4_tensor(viscosity_tensor);
-              
+                  // save viscosity tensor in stress-strain director to be used in
+                  anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::kelvin_to_r4_tensor(viscosity_tensor);
+
                 }
             }
 
@@ -558,7 +558,7 @@ namespace aspect
         {
           EquationOfState::LinearizedIncompressible<dim>::declare_parameters (prm);
 
-           prm.declare_entry ("Coefficients and intercept for F", "0.5920219168461529, -0.831936049, -0.000937583, -0.00029648, 0.380413345, -0.533048795, 0.46835862365145753, -0.000965503, -1.249340274, 1.0748554477472438, -0.167662132, 0.003358407, 0.5215020195972386",
+          prm.declare_entry ("Coefficients and intercept for F", "0.5920219168461529, -0.831936049, -0.000937583, -0.00029648, 0.380413345, -0.533048795, 0.46835862365145753, -0.000965503, -1.249340274, 1.0748554477472438, -0.167662132, 0.003358407, 0.5215020195972386",
                              Patterns::List(Patterns::Double()),
                              "12 Coefficients and 1 intercept to compute the Hill Parameter F "
                              "according to the linear regression relation provided in the cookbook documentation. "
@@ -583,7 +583,7 @@ namespace aspect
           prm.declare_entry ("Coefficients and intercept for N", "7.872922986831338, -7.933513948, -2.588175191, 0.029843804645040883, 7.605864624755694, -5.469451775, -0.347688637, 0.06395131, -1.78763278, 2.2550636824173584, 3.023166891521831, -0.102862765, 3.6958741003498234",
                              Patterns::List(Patterns::Double()),
                              "12 Coefficients and 1 intercept to compute the Hill Parameter N in the same way as above.");
-                             
+
           prm.declare_entry ("Reference viscosity", "1e9",
                              Patterns::Double(),
                              "Magnitude of reference viscosity.");
