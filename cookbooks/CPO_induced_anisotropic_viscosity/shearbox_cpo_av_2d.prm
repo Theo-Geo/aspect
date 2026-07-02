@@ -124,7 +124,7 @@ subsection Postprocess
 
   subsection Visualization
     set Time between graphical output = 0.1
-    set List of output variables = material properties, strain rate, named additional outputs, shear stress, stress
+    set List of output variables = material properties, strain rate, named additional outputs, shear stress, stress, Anisotropic stress
 
     subsection Material properties
       set List of material properties = density, viscosity
