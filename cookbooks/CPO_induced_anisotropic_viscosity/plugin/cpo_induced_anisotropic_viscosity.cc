@@ -161,7 +161,7 @@ namespace aspect
         out.template get_additional_output_object<MaterialModel::AnisotropicViscosity<dim>>();
       EquationOfStateOutputs<dim> eos_outputs (1);
       const unsigned int viscosity_field_index = this->introspection().compositional_index_for_name("scalar_viscosity");
-      
+
       const double n = stress_exponent;
 
       for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
@@ -279,7 +279,7 @@ namespace aspect
               R_CPO_K[5][5] = R[0][0]*R[1][1]+R[0][1]*R[1][0];
 
               SymmetricTensor<2,6> A;
-              A[0][0] = (2./3.) * (G+H); //(2./3.) * 
+              A[0][0] = (2./3.) * (G+H); //(2./3.) *
               A[0][1] = (2./3.) * (-H);
               A[0][2] = (2./3.) * (-G);
               A[1][1] = (2./3.) * (H+F);
@@ -331,7 +331,7 @@ namespace aspect
               // In the first time step using the actual strain rate can lead to convergence issue if the strain rate varies significantly within the model domain.
               // Thus for the first timestep we calculate an initial viscosity based on the strain rate.
               if (this->get_timestep_number() == 1)
-                {                  
+                {
                   scalar_viscosity= 1/Gamma * std::pow(edot_ii,((1. - n)/n));
                 }
 
@@ -481,7 +481,7 @@ namespace aspect
                              "Stress exponent for non-linear rheology");
           prm.declare_entry ("Fluidity constant", "1.1e-18",
                              Patterns::Double(),
-                             "Prefactor for Arhenius temperature activation. " 
+                             "Prefactor for Arhenius temperature activation. "
                              "For mantle rheology Gamma0 should be in the range of 1e-16 to 1e-18. "
                              "Experimental constraints on the value of Gamma0 for olivine dislocation creep "
                              "are provided in Hirth and Kohlstedt (2003) and can be used to calibrate this "

@@ -86,11 +86,11 @@ namespace aspect
 
         double grain_size;
 
-        double stress_exponent; 
-        double activation_energy; 
-        double fluidity_constant; 
-        double grain_size_exponent; 
-        
+        double stress_exponent;
+        double activation_energy;
+        double fluidity_constant;
+        double grain_size_exponent;
+
         /** The iteration for computing scalar viscosity is terminated when the relative change falls below the relative tolerance. */
         double relative_tolerance;
         unsigned int max_iteration;
