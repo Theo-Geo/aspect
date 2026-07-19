@@ -3,7 +3,7 @@
 # The particle includes 1000 grains with initially random orientations (isotropic
 # texture), which then evolves into a CPO aligned with the shear direction.
 
-set Additional shared libraries  = /home/bbkyijun/aspect/cookbooks/CPO_induced_anisotropic_viscosity/plugin/libCPO_induced_anisotropic_viscosity.debug.so
+set Additional shared libraries  = ./plugin/libCPO_induced_anisotropic_viscosity.debug.so
 set CFL number                   = 0.1
 set Timing output frequency      = 10000
 set Dimension                    = 3
@@ -155,7 +155,7 @@ subsection Particles
 
   subsection Generator
     subsection Ascii file
-      set Data directory = /home/bbkyijun/aspect/cookbooks/CPO_induced_anisotropic_viscosity/
+      set Data directory = .
       set Data file name = particle_one.dat
     end
   end

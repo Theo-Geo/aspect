@@ -186,17 +186,12 @@ namespace aspect
                strain_rate - 1./3. * trace(strain_rate) * unit_symmetric_tensor<dim>()
                :
                strain_rate);
-          // const double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
-          //                               min_strain_rate);
-          const double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
-                                        min_strain_rate);
 
-          // Create constant value to use for AV
-          // const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*in.temperature[q]));
-          // // The default values of fluidity constant (for stress in MPa and grain size in microns), activation energy come from Hirth and Kohlstedt (2003)
-          // // The default value of grain size exponent comes from Hansen et al. (2016b)
-          // // The resulting Gamme is equal to 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=0.001 meter (default value, converted to microns)
-          // const double Gamma = (A_o/(std::pow(grain_size*1e6, grain_size_exponent)));
+          // // Create constant value to use for AV
+          // const double A_o = fluidity_constant*std::exp(-530000/(8.314*in.temperature[q]));
+          // // const double n = 3.5; //n=3 for test against VPSC, n=3.5 for D-Rex in ASPECT
+          // // The values of A_o and 0.73 were picked so that Gamma = 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=1000 microns
+          // const double Gamma = (A_o/(std::pow(grain_size,0.73)));
 
           const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*std::max(in.temperature[q],1.0e-10)));
           // 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
@@ -207,6 +202,7 @@ namespace aspect
           // and when the condition allows dislocation creep
           if  ((this->simulator_is_past_initialization()) && (this->get_timestep_number() > 0) && (in.temperature[q]>1000) && (std::isfinite(determinant(deviatoric_strain_rate))) && (anisotropic_viscosity != nullptr))
             {
+
               // Get eigenvalues from compositional fields
               const std::vector<double> &composition = in.composition[q];
               const double eigvalue_a1 = composition[cpo_bingham_avg_a[1]];
@@ -279,7 +275,7 @@ namespace aspect
               R_CPO_K[5][5] = R[0][0]*R[1][1]+R[0][1]*R[1][0];
 
               SymmetricTensor<2,6> A;
-              A[0][0] = (2./3.) * (G+H); //(2./3.) *
+              A[0][0] = (2./3.) * (G+H);
               A[0][1] = (2./3.) * (-H);
               A[0][2] = (2./3.) * (-G);
               A[1][1] = (2./3.) * (H+F);
@@ -332,20 +328,22 @@ namespace aspect
               // Thus for the first timestep we calculate an initial viscosity based on the strain rate.
               if (this->get_timestep_number() == 1)
                 {
+                  const double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
+                                                min_strain_rate);
                   scalar_viscosity= 1/Gamma * std::pow(edot_ii,((1. - n)/n));
                 }
 
               unsigned int n_iterations = 0;
+              // const unsigned int max_iteration = 100;
               double residual = scalar_viscosity;
               double threshold = relative_tolerance*scalar_viscosity;
-
               // Here we convert stress to MPa to be consistent with the constitutive equation defined in Signorelli et al. (2021),
               // in which the stress is in MPa.
-              SymmetricTensor<2,dim> stress = scalar_viscosity * V_r4 * deviatoric_strain_rate;
+              SymmetricTensor<2,dim> stress = scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6;
 
               while (std::abs(residual) > threshold && n_iterations < max_iteration)
                 {
-                  stress = (1./2.) * (stress + scalar_viscosity * V_r4 * deviatoric_strain_rate);
+                  stress = (1./2.) * (stress + scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6);
 
                   const Tensor<2,dim> S_CPO= R * stress * transpose(R);
 
@@ -360,10 +358,10 @@ namespace aspect
                   AssertThrow(Jhill >= 0,
                               ExcMessage("Jhill should not be negative"));
 
-                  const double scalar_viscosity_new = (1. / (Gamma * std::pow(Jhill,(n-1)/2)));
+                  const double scalar_viscosity_new = (1 / (Gamma * std::pow(Jhill,(n-1)/2)));
                   residual = std::abs(scalar_viscosity_new - scalar_viscosity);
                   scalar_viscosity = scalar_viscosity_new;
-                  threshold = relative_tolerance*scalar_viscosity;
+                  threshold = 0.001*scalar_viscosity;
                   n_iterations++;
 
                 }
@@ -378,12 +376,28 @@ namespace aspect
             }
           else // timestep == 0 or no anisotropic viscosity
             {
+              // if ((this->simulator_is_past_initialization()) && (std::isfinite(determinant(deviatoric_strain_rate))))
+              //   {
+              //     // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
+              //     double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
+              //                                   min_strain_rate);
+              //     out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n)); //
+              //     double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
+              //                                   min_strain_rate);
+              //     out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n));
+              //   }
+
               if (anisotropic_viscosity != nullptr)
                 {
-                  if ((this->simulator_is_past_initialization()) && (in.temperature[q]>1000) && (std::isfinite(determinant(deviatoric_strain_rate))))
+                  if ((this->simulator_is_past_initialization()) && (std::isfinite(determinant(deviatoric_strain_rate))))
                     {
                       // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
-                      out.viscosities[q] = 1/Gamma*std::pow(edot_ii,((1. - n)/n)); //
+                      // double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
+                      //                               min_strain_rate);
+                      // out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n)); //
+                      double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
+                                              min_strain_rate);
+                      out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n));
                     }
                   // Assign an isotropic viscosity tensor
                   SymmetricTensor<2,6> V;
@@ -479,15 +493,9 @@ namespace aspect
           prm.declare_entry ("Stress exponent", "3.5",
                              Patterns::Double(),
                              "Stress exponent for non-linear rheology");
-          prm.declare_entry ("Fluidity constant", "1.1e-18",
+          prm.declare_entry ("Fluidity constant", "1.1e5",
                              Patterns::Double(),
-                             "Prefactor for Arhenius temperature activation. "
-                             "For mantle rheology Gamma0 should be in the range of 1e-16 to 1e-18. "
-                             "Experimental constraints on the value of Gamma0 for olivine dislocation creep "
-                             "are provided in Hirth and Kohlstedt (2003) and can be used to calibrate this "
-                             "parameter for different mantle conditions. The value of 1.1e-18 is chosen so that "
-                             "the reference viscosity is 1e21 Pa s at T=1600K and d=1000 microns, "
-                             "which is consistent with typical upper mantle conditions.");
+                             "Prefactor for Arhenius temperature activation");
           prm.declare_entry ("Activation energy", "530000.0",
                              Patterns::Double(),
                              "Activation energy for Arhenius temperature dependence of rheology");
