@@ -219,7 +219,7 @@ namespace aspect
       std::vector<int> ji = {1,2,0}; // tuple of indices shifted by one
       std::vector<int> ki = {2,0,1}; // tuple of indices shifted by two
 
-      std::vector<double> Hi = {F, G, H, M, N, L};
+      std::vector<double> Hi = {F, G, H, L, M, N};
       const double gam = 4*(Hi[2]*Hi[1] + Hi[0]*Hi[2] + Hi[0]*Hi[1]);
 
       double anisotropic_invariant = 0.0;
@@ -288,13 +288,6 @@ namespace aspect
                strain_rate_3d);
 
           // Create constant value to use for AV
-
-          const double A_o = fluidity_constant*std::exp(-activation_energy/(8.314*std::max(in.temperature[q],1.0e-10)));
-          // 1.1e5*std::exp(-530000/(8.314*in.temperature[q]));
-          // The values of A_o and 0.73 were picked so that Gamma = 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=1000 microns
-          const double Gamma = (A_o/(std::pow(grain_size, grain_size_exponent)));
-
-          // // Create constant value to use for AV
           // const double A_o = fluidity_constant*std::exp(-530000/(8.314*in.temperature[q]));
           // // const double n = 3.5; //n=3 for test against VPSC, n=3.5 for D-Rex in ASPECT
           // // The values of A_o and 0.73 were picked so that Gamma = 3.5322e-15[1/(s*Pa^n)] if T=1600K and d=1000 microns
@@ -309,10 +302,6 @@ namespace aspect
           // and when the condition allows dislocation creep
           if  ((this->simulator_is_past_initialization()) && (this->get_timestep_number() > 0) && (std::isfinite(determinant(deviatoric_strain_rate))) && (anisotropic_viscosity != nullptr)) // && (in.temperature[q]>1000)
             {
-<<<<<<< HEAD
-=======
-
->>>>>>> yijun/cpo2hill_v3
               // Get eigenvalues from compositional fields
               const std::vector<double> &composition = in.composition[q];
               const double eigvalue_a1 = composition[cpo_bingham_avg_a[1]];
@@ -331,12 +320,9 @@ namespace aspect
               const double phi2 = composition[cpo_bingham_avg_c[0]];
 
               const Tensor<2,3> R = euler_angles_to_rotation_matrix(phi1, theta, phi2);
-<<<<<<< HEAD
 
               // initialize scalar viscosity
               double scalar_viscosity = composition[viscosity_field_index];
-=======
->>>>>>> yijun/cpo2hill_v3
 
               // Compute Hill Parameters FGHLMN from the eigenvalues of a,b,c axis
               // CPO2Hill v3 model:
@@ -391,26 +377,8 @@ namespace aspect
               R_CPO_K[5][4] = R[0][0]*R[1][2]+R[0][2]*R[1][0];
               R_CPO_K[5][5] = R[0][0]*R[1][1]+R[0][1]*R[1][0];
 
-<<<<<<< HEAD
               // using the analytical inversion based on principal invariants of orthotropic symmetry group
               if (use_analytical_inversion == true)
-=======
-              SymmetricTensor<2,6> A;
-              A[0][0] = (2./3.) * (G+H);
-              A[0][1] = (2./3.) * (-H);
-              A[0][2] = (2./3.) * (-G);
-              A[1][1] = (2./3.) * (H+F);
-              A[1][2] = (2./3.) * (-F);
-              A[2][2] = (2./3.) * (F+G);
-              A[3][3] = (2./3.) * (L);
-              A[4][4] = (2./3.) * (M);
-              A[5][5] = (2./3.) * (N);
-
-              // A is the anisotropic tensor for the fluidity. We need its inverse, but it's not invertible due to singularity.
-              // Thus we compute the Moore-Penrose pseudo inverse using SVD
-              LAPACKFullMatrix<double> A_mat_lapack(6,6), pinvA_mat_lapack(6,6);
-              for (unsigned int ai=0; ai<6; ++ai)
->>>>>>> yijun/cpo2hill_v3
                 {
                   // rotate 3d strain-rate into cpo frame and compute scalar anisotropic viscosity
                   Tensor<2,3> strain_rate_cpo = R*strain_rate_3d*transpose(R);
@@ -488,9 +456,8 @@ namespace aspect
                     }
 
                   unsigned int n_iterations = 0;
-                  const unsigned int max_iteration = 100;
                   double residual = scalar_viscosity;
-                  double threshold = 0.0001*scalar_viscosity;
+                  double threshold = relative_tolerance*scalar_viscosity;
                   // Here we convert stress to MPa to be consistent with the constitutive equation defined in Signorelli et al. (2021),
                   // in which the stress is in MPa.
                   SymmetricTensor<2,3> stress = scalar_viscosity * viscosity_tensor_3D_r4 * deviatoric_strain_rate; // 2 * / 1e6;
@@ -515,74 +482,11 @@ namespace aspect
                       const double scalar_viscosity_new = (1 / (Gamma * std::pow(Jhill,(n-1)/2)));
                       residual = std::abs(scalar_viscosity_new - scalar_viscosity);
                       scalar_viscosity = scalar_viscosity_new;
-                      threshold = 0.0001*scalar_viscosity;
+                      threshold = relative_tolerance*scalar_viscosity;
                       n_iterations++;
                     }
                 }
 
-<<<<<<< HEAD
-=======
-              // Calculate the fluidity tensor in the CPO frame
-              const Tensor<2,6> V = transpose(R_CPO_K) * invA * R_CPO_K;
-
-              // Convert rank 2 viscosity tensor to rank 4
-              FullMatrix<double> V_mat(6,6);
-              for (unsigned int vi=0; vi<6; ++vi)
-                {
-                  for (unsigned int vj=0; vj<6; ++vj)
-                    {
-                      V_mat[vi][vj] = V[vi][vj];
-                    }
-                }
-              SymmetricTensor<4,dim> V_r4;
-              dealii::Physics::Notation::Kelvin::to_tensor(V_mat, V_r4);
-              anisotropic_viscosity->stress_strain_directors[q] = V_r4;
-
-              double scalar_viscosity = composition[viscosity_field_index];
-
-              // In the first time step using the actual strain rate can lead to convergence issue if the strain rate varies significantly within the model domain.
-              // Thus for the first timestep we calculate an initial viscosity based on the strain rate.
-              if (this->get_timestep_number() == 1)
-                {
-                  const double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
-                                                min_strain_rate);
-                  scalar_viscosity= 1/Gamma * std::pow(edot_ii,((1. - n)/n));
-                }
-
-              unsigned int n_iterations = 0;
-              // const unsigned int max_iteration = 100;
-              double residual = scalar_viscosity;
-              double threshold = relative_tolerance*scalar_viscosity;
-              // Here we convert stress to MPa to be consistent with the constitutive equation defined in Signorelli et al. (2021),
-              // in which the stress is in MPa.
-              SymmetricTensor<2,dim> stress = scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6;
-
-              while (std::abs(residual) > threshold && n_iterations < max_iteration)
-                {
-                  stress = (1./2.) * (stress + scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6);
-
-                  const Tensor<2,dim> S_CPO= R * stress * transpose(R);
-
-                  double Jhill = 2./3. * (F*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[2][2]) + G*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[0][0]) + H*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[1][1]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]));
-                  if (Jhill < 0)
-                    {
-                      Jhill = 2./3. * (std::abs(F)*Utilities::fixed_power<2>(S_CPO[1][1]-S_CPO[2][2]) + std::abs(G)*Utilities::fixed_power<2>(S_CPO[2][2]-S_CPO[0][0]) + std::abs(H)*Utilities::fixed_power<2>(S_CPO[0][0]-S_CPO[1][1]) + 2*L*Utilities::fixed_power<2>(S_CPO[1][2]) + 2*M*Utilities::fixed_power<2>(S_CPO[0][2]) + 2*N*Utilities::fixed_power<2>(S_CPO[0][1]));
-                    }
-
-                  AssertThrow(std::isfinite(Jhill),
-                              ExcMessage("Jhill should be finite"));
-                  AssertThrow(Jhill >= 0,
-                              ExcMessage("Jhill should not be negative"));
-
-                  const double scalar_viscosity_new = (1 / (Gamma * std::pow(Jhill,(n-1)/2)));
-                  residual = std::abs(scalar_viscosity_new - scalar_viscosity);
-                  scalar_viscosity = scalar_viscosity_new;
-                  threshold = 0.001*scalar_viscosity;
-                  n_iterations++;
-
-                }
-              // Store the scalar viscosity in out.viscosities
->>>>>>> yijun/cpo2hill_v3
               out.viscosities[q] = scalar_viscosity;
 
               AssertThrow(std::isfinite(out.viscosities[q]),
@@ -593,7 +497,6 @@ namespace aspect
             }
           else // timestep == 0 or no anisotropic viscosity
             {
-<<<<<<< HEAD
               if ((this->simulator_is_past_initialization()) && (std::isfinite(determinant(deviatoric_strain_rate))))
                 {
                   // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
@@ -602,18 +505,6 @@ namespace aspect
                   out.viscosities[q] = std::pow(Gamma, (-1/n))*std::pow(edot_ii,((1. - n)/n)); //
 
                 }
-=======
-              // if ((this->simulator_is_past_initialization()) && (std::isfinite(determinant(deviatoric_strain_rate))))
-              //   {
-              //     // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
-              //     double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
-              //                                   min_strain_rate);
-              //     out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n)); //
-              //     double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
-              //                                   min_strain_rate);
-              //     out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n));
-              //   }
->>>>>>> yijun/cpo2hill_v3
 
               if (anisotropic_viscosity != nullptr)
                 {
@@ -628,7 +519,6 @@ namespace aspect
                       out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n));
                     }
                   // Assign an isotropic viscosity tensor
-<<<<<<< HEAD
                   SymmetricTensor<2,6> viscosity_tensor;
                   viscosity_tensor[0][0] = 2.0/3.0;  // 4.0/9.0;
                   viscosity_tensor[0][1] = -1.0/3.0; // -2.0/9.0;
@@ -642,18 +532,6 @@ namespace aspect
 
                   // save viscosity tensor in stress-strain director to be used in
                   anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::kelvin_to_r4_tensor(viscosity_tensor);
-=======
-                  SymmetricTensor<2,6> V;
-                  V[0][0] = 2.0/3.0;
-                  V[0][1] = -1.0/3.0;
-                  V[0][2] = -1.0/3.0;
-                  V[1][1] = 2.0/3.0;
-                  V[1][2] = -1.0/3.0;
-                  V[2][2] = 2.0/3.0;
-                  V[3][3] = 1.;
-                  V[4][4] = 1.;
-                  V[5][5] = 1.;
->>>>>>> yijun/cpo2hill_v3
 
                 }
             }
@@ -722,12 +600,6 @@ namespace aspect
           prm.declare_entry ("Grain size", "1.0e-3",
                              Patterns::Double(),
                              "Olivine anisotropic viscosity is dependent of grain size. Value is given in meters");
-<<<<<<< HEAD
-=======
-          prm.declare_entry ("Stress exponent", "3.5",
-                             Patterns::Double(),
-                             "Stress exponent for non-linear rheology");
->>>>>>> yijun/cpo2hill_v3
           prm.declare_entry ("Fluidity constant", "1.1e5",
                              Patterns::Double(),
                              "Prefactor for Arhenius temperature activation");
@@ -736,7 +608,6 @@ namespace aspect
                              "Activation energy for Arhenius temperature dependence of rheology");
           prm.declare_entry ("Grain size exponent", "0.73",
                              Patterns::Double(),
-<<<<<<< HEAD
                              "Exponent for grainsize dependence");
           prm.declare_entry ("Stress exponent", "3.5",
                              Patterns::Double(),
@@ -744,15 +615,12 @@ namespace aspect
           prm.declare_entry ("Use analytical inversion", "false",
                              Patterns::Bool (),
                              "Whether to use the analytical or the iterative inversion for the anisotropic scalar viscosity.");
-=======
-                             "Exponent for grain-size dependence");
           prm.declare_entry ("Relative tolerance for iteration", "0.0001",
                              Patterns::Double(),
                              "The iteration for computing scalar viscosity is terminated when the relative change falls below the relative tolerance.");
           prm.declare_entry ("Maximum number of iterations", "100",
                              Patterns::Integer(),
                              "To prevent excessive computation, the number of iterations with a maximum number of iterations.");
->>>>>>> yijun/cpo2hill_v3
         }
         prm.leave_subsection();
       }
@@ -778,12 +646,9 @@ namespace aspect
           fluidity_constant = prm.get_double("Fluidity constant");
           grain_size_exponent = prm.get_double("Grain size exponent");
           activation_energy = prm.get_double("Activation energy");
-<<<<<<< HEAD
           use_analytical_inversion  = prm.get_bool ("Use analytical inversion");
-=======
           relative_tolerance = prm.get_double("Relative tolerance for iteration");
           max_iteration = prm.get_integer("Maximum number of iterations");
->>>>>>> yijun/cpo2hill_v3
           CnI_F = dealii::Utilities::string_to_double(dealii::Utilities::split_string_list(prm.get("Coefficients and intercept for F")));
           CnI_G = dealii::Utilities::string_to_double(dealii::Utilities::split_string_list(prm.get("Coefficients and intercept for G")));
           CnI_H = dealii::Utilities::string_to_double(dealii::Utilities::split_string_list(prm.get("Coefficients and intercept for H")));
