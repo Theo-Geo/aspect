@@ -16,7 +16,7 @@ This cookbook explains how to use the CPO-induced anisotropic viscosity material
 
 ## Introduction
 
-Individual crystals of the mineral olivine reorganize their orientations into crystal-preferred orientations (CPO) under deformation. The viscous properties of olivine crystals are direction-dependent (anisotropic), which suggests that the effective viscosity for olivine rocks/aggregates is different when deformations occur in different directions relative to the CPO. This cookbook model computes an anisotropic viscosity based on the CPO evolution predicted by D-Rex ({cite}`fraters_billen_2021_cpo`; {cite}`kaminski2004`) and includes this information in the subsequent modeling process.
+Individual crystals of the mineral olivine reorganize their orientations into crystal-preferred orientations (CPO) under deformation. The viscous properties of olivine crystals are direction-dependent (anisotropic), which suggests that the effective viscosity for olivine rocks/aggregates is different when deformations occur in different directions relative to the CPO. This cookbook model computes an anisotropic viscosity based on the CPO evolution predicted by D-Rex ({cite}`fraters_billen_2021_cpo`; {cite}`kaminski2004`) and includes this information in the subsequent modeling process based on the formulation of Király at al., (in rev.).
 
 ### Forward Rheology
 
@@ -47,6 +47,9 @@ and $A_{ij}$ is the anisotropic tensor of fluidity in Kelvin notation:
 :label: eqn:anisotropic_fluidity
 A_{ij}=\frac{2}{3} \left[
 \begin{matrix}
+G+H & -H & -G & 0 & 0 & 0 \\
+-H & H+F & -F & 0 & 0 & 0 \\
+-G & -F & F+G & 0 & 0 & 0 \\
 G+H & -H & -G & 0 & 0 & 0 \\
 -H & H+F & -F & 0 & 0 & 0 \\
 -G & -F & F+G & 0 & 0 & 0 \\
