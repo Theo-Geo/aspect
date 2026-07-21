@@ -190,7 +190,7 @@ namespace aspect
       std::vector<int> ki = {2,0,1}; // tuple of indices shifted by two
 
       SymmetricTensor<2,6> visc_tensor;
-      std::vector<double> Hi = {F, G, H, M, N, L};
+      std::vector<double> Hi = {F, G, H, L, M, N};
 
       const double gam = 4*(Hi[2]*Hi[1] + Hi[0]*Hi[2] + Hi[0]*Hi[1]);
 
@@ -302,7 +302,7 @@ namespace aspect
 
           // The computation of the viscosity tensor is only necessary after the simulator has been initialized
           // and when the condition allows dislocation creep
-          if  ((this->simulator_is_past_initialization()) && (this->get_timestep_number() > 0) && (in.temperature[q]>1000) && (std::isfinite(determinant(deviatoric_strain_rate))) && (anisotropic_viscosity != nullptr))
+          if  ((this->simulator_is_past_initialization()) && (this->get_timestep_number() > 0) && (std::isfinite(determinant(deviatoric_strain_rate))) && (anisotropic_viscosity != nullptr))
             {
 
               // Get eigenvalues from compositional fields
@@ -444,17 +444,16 @@ namespace aspect
                       scalar_viscosity= std::pow(Gamma,-1/n)*std::pow(edot_ii,((1. - n)/n));
                     }
 
-              unsigned int n_iterations = 0;
-              // const unsigned int max_iteration = 100;
-              double residual = scalar_viscosity;
-              double threshold = relative_tolerance*scalar_viscosity;
-              // Here we convert stress to MPa to be consistent with the constitutive equation defined in Signorelli et al. (2021),
-              // in which the stress is in MPa.
-              SymmetricTensor<2,dim> stress = scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6;
+                  unsigned int n_iterations = 0;
+                  double residual = scalar_viscosity;
+                  double threshold = relative_tolerance*scalar_viscosity;
+                  // Here we convert stress to MPa to be consistent with the constitutive equation defined in Signorelli et al. (2021),
+                  // in which the stress is in MPa.
+                  SymmetricTensor<2,3> stress = scalar_viscosity * viscosity_tensor_3D_r4 * deviatoric_strain_rate / 1e6;
 
-              while (std::abs(residual) > threshold && n_iterations < max_iteration)
-                {
-                  stress = (1./2.) * (stress + scalar_viscosity * V_r4 * deviatoric_strain_rate / 1e6);
+                  while (std::abs(residual) > threshold && n_iterations < max_iteration)
+                    {
+                      stress = (1./2.) * (stress + scalar_viscosity * viscosity_tensor_3D_r4 * deviatoric_strain_rate / 1e6);
 
                   const Tensor<2,dim> S_CPO= R * stress * transpose(R);
 
@@ -487,17 +486,6 @@ namespace aspect
             }
           else // timestep == 0 or no anisotropic viscosity
             {
-              // if ((this->simulator_is_past_initialization()) && (std::isfinite(determinant(deviatoric_strain_rate))))
-              //   {
-              //     // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
-              //     double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
-              //                                   min_strain_rate);
-              //     out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n)); //
-              //     double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
-              //                                   min_strain_rate);
-              //     out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n));
-              //   }
-
               if (anisotropic_viscosity != nullptr)
                 {
                   if ((this->simulator_is_past_initialization()) && (std::isfinite(determinant(deviatoric_strain_rate))))
@@ -511,16 +499,16 @@ namespace aspect
                       out.viscosities[q] = 1/Gamma * std::pow(edot_ii,((1. - n)/n));
                     }
                   // Assign an isotropic viscosity tensor
-                  SymmetricTensor<2,6> V;
-                  V[0][0] = 2.0/3.0;
-                  V[0][1] = -1.0/3.0;
-                  V[0][2] = -1.0/3.0;
-                  V[1][1] = 2.0/3.0;
-                  V[1][2] = -1.0/3.0;
-                  V[2][2] = 2.0/3.0;
-                  V[3][3] = 1.;
-                  V[4][4] = 1.;
-                  V[5][5] = 1.;
+                  SymmetricTensor<2,6> viscosity_tensor;
+                  viscosity_tensor[0][0] = 2.0/3.0;
+                  viscosity_tensor[0][1] = -1.0/3.0;
+                  viscosity_tensor[0][2] = -1.0/3;
+                  viscosity_tensor[1][1] = 2.0/3.0;
+                  viscosity_tensor[1][2] = -1.0/3.0;
+                  viscosity_tensor[2][2] = 2.0/3.0;
+                  viscosity_tensor[3][3] = 1.0;
+                  viscosity_tensor[4][4] = 1.0;
+                  viscosity_tensor[5][5] = 1.0;
 
                   // save viscosity tensor in stress-strain director to be used in
                   anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::kelvin_to_r4_tensor(viscosity_tensor);
