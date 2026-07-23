@@ -35,5 +35,5 @@ DEAL_II_INITIALIZE_CACHED_VARIABLES()
 set(TARGET "tosi-aniso")
 project(${TARGET})
 
-add_library(${TARGET} SHARED tosi-aniso-dev.cc ../../../cookbooks/CPO_induced_anisotropic_viscosity/plugin/cpo_induced_anisotropic_viscosity.cc ../../../cookbooks/CPO_induced_anisotropic_viscosity/plugin/cpo_induced_anisotropic_viscosity.h)
+add_library(${TARGET} SHARED tosi-aniso.cc ../../../cookbooks/CPO_induced_anisotropic_viscosity/plugin/cpo_induced_anisotropic_viscosity.cc ../../../cookbooks/CPO_induced_anisotropic_viscosity/plugin/cpo_induced_anisotropic_viscosity.h)
 ASPECT_SETUP_PLUGIN(${TARGET})

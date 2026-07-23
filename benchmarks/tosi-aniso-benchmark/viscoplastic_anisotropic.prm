@@ -1,7 +1,6 @@
-include ../Tosi_base-2D-CPO.prm
+include $ASPECT_SOURCE_DIR/benchmarks/tosi-aniso-benchmark/Tosi_base-2D-CPO.prm
 
-set Additional shared libraries            = ./libtosi-aniso.so
-set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-viscoplastic-2D-ana-quad-CPO
+set Output directory                       = $ASPECT_SOURCE_DIR/../output/aniso-viscoplastic/output-viscoplastic
 set Nonlinear solver tolerance             = 1e-4 # 8e-4
 set End time                = 0.2
 set Maximum first time step = 1e-5
@@ -32,6 +31,7 @@ subsection Material model
     set Yield stress          = 1
     set Nonlinear viscosity constant  = 1e-3
     set Initial viscosity        = 0.115
+    
     # parameter value as in Rathmann et. al. 2024
     set Rate factor = 100         # chosen to match plume passing lid timing
     set Power law exponent = 3.5  # chosen as representative for disocation creep

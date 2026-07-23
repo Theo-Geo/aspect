@@ -343,8 +343,6 @@ namespace aspect
          */
         std::unique_ptr<MaterialModel::Interface<dim>> base_model;
 
-        // MaterialModel::MaterialModelOutputs<dim> &outbase; 
-
     };
 
     /*
@@ -513,7 +511,7 @@ namespace aspect
           prm.declare_entry("Base model","simple",
                             Patterns::Selection(MaterialModel::get_valid_model_names_pattern<dim>()),
                             "Name of the material model from which the evaluate function is called.");
-          prm.declare_entry("Power law exponent","1e3",
+          prm.declare_entry("Power law exponent","1e5",
                             Patterns::Double (0),
                             "The value of the stress exponent in equ. (20) of Rathmann et. al 2024."); 
           prm.declare_entry("Rate factor", "1",

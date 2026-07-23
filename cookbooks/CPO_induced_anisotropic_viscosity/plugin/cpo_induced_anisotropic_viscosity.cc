@@ -218,7 +218,7 @@ namespace aspect
       std::vector<int> ji = {1,2,0}; // tuple of indices shifted by one 
       std::vector<int> ki = {2,0,1}; // tuple of indices shifted by two
 
-      std::vector<double> Hi = {F, G, H, M, N, L};
+      std::vector<double> Hi = {F, G, H, L, M, N};
       const double gamma = 4*(Hi[2]*Hi[1] + Hi[0]*Hi[2] + Hi[0]*Hi[1]);
 
       double anisotropic_invariant = 0.0;
@@ -315,7 +315,9 @@ namespace aspect
               const double theta = composition[cpo_bingham_avg_b[0]];
               const double phi2 = composition[cpo_bingham_avg_c[0]];
 
-              const Tensor<2,3> R = euler_angles_to_rotation_matrix(phi1, theta, phi2);
+              // get a passive rotation from lab frame to cpo frame 
+              const Tensor<2,3> R = Utilities::zxz_euler_angles_to_rotation_matrix(phi1, theta, phi2);
+              // euler_angles_to_rotation_matrix(phi1, theta, phi2);
 
               // initialize scalar viscosity
               double scalar_viscosity = composition[viscosity_field_index];
