@@ -58,15 +58,18 @@ namespace aspect
    *
    * @ingroup MaterialModels
    */
-  namespace TosiBenchmark
+  namespace TosiRathmannBenchmark
   {
     /**
      * @ingroup MaterialModels
      */
     template <int dim>
-    class TosiMaterial : public MaterialModel::Interface<dim>, public ::aspect::SimulatorAccess<dim>
+    class TosiRathmannMaterial : public MaterialModel::Interface<dim>, public ::aspect::SimulatorAccess<dim>
     {
       public:
+        /**
+         * also initializes cpo av model to set the assembler which can handle anisotropic vicosity 
+         */
         void
         initialize() override; 
 
@@ -75,7 +78,7 @@ namespace aspect
         {
           /**
            * As described in Tosi et al (2015), the viscosity \eta is computed as the
-           * harmonic average of a linear and nonlinear plastic part.
+           * harmonic average of a linear and nonlinear plastic part. The rheology is ammended to use and anistrotropic non-linear anisotropic viscosity by Rathmann et. al. (2024)
            *
            * The linear part is calculated as follows
            * (see below for the meaning of the used parameter names):
@@ -152,6 +155,11 @@ namespace aspect
         void
         parse_parameters (ParameterHandler &prm) override;
 
+        /**
+         * Wraps CPO_AV_3D::create_additional_named_outputs and initialize to generate
+         * Those generate the anisotropic viscosity tensor also called stress strain director as an additional output
+         * choose the correct assembler which can use this anisotropic viscosity tensor.  
+         */
         void
         create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const override;
 
@@ -176,7 +184,7 @@ namespace aspect
 
         /*
          * Function to compute the plastic viscosity
-         * according to equation (8) of the paper.
+         * according to equation (19) of Rathmann et.al..
          */
         double viscoplast(const double eta_asterisk,
                           const double aniso_visc) const;
@@ -240,7 +248,7 @@ namespace aspect
         double eta_initial;
 
         /**
-         * Pointer to the material model used as the base model
+         * Pointer to cpo_av material model used as the base model
          */
         std::unique_ptr<MaterialModel::Interface<dim>> cpo_av;
 
@@ -248,11 +256,11 @@ namespace aspect
 
     /*
      * Function to calculate the viscosity according
-     * to equation (6) of the paper.
+     * to equation (6) of Tosi et.al.
      */
     template <int dim>
     double
-    TosiMaterial<dim>::
+    TosiRathmannMaterial<dim>::
     viscosity (const double temperature,
                const double,
                const std::vector<double> &,
@@ -268,13 +276,13 @@ namespace aspect
           return eta_initial;
         }
 
-      // Otherwise we compute the linear viscosity and, if needed, the plastic viscosity.
+      // Otherwise we compute the linear viscosity and the plastic viscosity.
       double viscosity = 0.0;
       const double visc_linear = viscolin(eta_T,eta_Z,temperature,0);
 
       const double visc_plastic = viscoplast(eta_asterisk, aniso_viscosity);
 
-      // Compute the harmonic average (equation (6) of the paper)
+      // Compute the harmonic average (equation (6) of Tosi et.al.)
       viscosity = 2.0 / ((1.0 / visc_linear) + (1.0 / visc_plastic));
   
       // Cut-off the viscosity by user-defined values to avoid possible very large viscosity ratios
@@ -283,13 +291,13 @@ namespace aspect
       return viscosity;
     }
 
-    /*
+    /**
      * Function to compute the linear viscosity
      * according to equation (7) of Tosi et al. 2015.
      */
     template <int dim>
     double
-    TosiMaterial<dim>::
+    TosiRathmannMaterial<dim>::
     viscolin(const double etaT,
              const double etaZ,
              const double T,
@@ -299,13 +307,13 @@ namespace aspect
       return std::exp((-1.0 * std::log(etaT) * T ) + (std::log(etaZ) * z));
     }
 
-    /*
+    /**
      * Function to compute the plastic viscosity
-     * according to equation (8) of the paper.
+     * according to equation (19) of Rathmann et.al.
      */
     template <int dim>
     double
-    TosiMaterial<dim>::
+    TosiRathmannMaterial<dim>::
     viscoplast(const double etaasterisk,
                const double aniso_visc) const
     { 
@@ -314,37 +322,35 @@ namespace aspect
     }
 
     /**
-     * initialize cpo av model to set the assembler 
      * create additional named outputs for Anisotropic tensor
      */
-
     template <int dim>
     void
-    TosiMaterial<dim>::initialize()
+    TosiRathmannMaterial<dim>::initialize()
     {
       cpo_av->initialize();
     }
     
     template <int dim>
     bool
-    TosiMaterial<dim>::
+    TosiRathmannMaterial<dim>::
     is_compressible () const
     {
       AssertThrow(!(cpo_av->is_compressible()), 
-        ExcMessage("CPO material material model is not allowed to be compressible"));
+        ExcMessage("anisotropic material model is not allowed to be compressible"));
       return false;
     }
 
     template <int dim>
     void
-    TosiMaterial<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
+    TosiRathmannMaterial<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
     {
       cpo_av->create_additional_named_outputs(out);
     }
 
     template <int dim>
     void
-    TosiMaterial<dim>::declare_parameters (ParameterHandler &prm)
+    TosiRathmannMaterial<dim>::declare_parameters (ParameterHandler &prm)
     {
       // Default values are for Case 1 of Tosi et al. (2015).
       prm.enter_subsection("Material model");
@@ -397,7 +403,7 @@ namespace aspect
 
     template <int dim>
     void
-    TosiMaterial<dim>::parse_parameters (ParameterHandler &prm)
+    TosiRathmannMaterial<dim>::parse_parameters (ParameterHandler &prm)
     {
       prm.enter_subsection("Material model");
       {
@@ -415,9 +421,8 @@ namespace aspect
           eta_maximum                = prm.get_double ("Maximum viscosity");
           eta_initial                = prm.get_double ("Initial viscosity");
 
-          // create the base model and initialize its SimulatorAccess base
-          // class; it will get a chance to read its parameters below after we
-          // leave the current section
+          
+          //create cpo_av base model and initialize its SimulatorAccess base class 
           cpo_av = MaterialModel::create_material_model<dim>("CPO-induced anisotropic viscosity");
           if (SimulatorAccess<dim> *sim = dynamic_cast<SimulatorAccess<dim>*>(cpo_av.get()))
             sim->initialize_simulator (this->get_simulator());
@@ -444,25 +449,23 @@ namespace aspect
   }
 }
 
-
-
 // explicit instantiations
 namespace aspect
 {
-  namespace TosiBenchmark
+  namespace TosiRathmannBenchmark
   {
-    ASPECT_REGISTER_MATERIAL_MODEL(TosiMaterial,
-                                   "TosiMaterial",
+    ASPECT_REGISTER_MATERIAL_MODEL(TosiRathmannMaterial,
+                                   "TosiRathmannMaterial",
                                    "A material model that has constant values "
-                                   "for all coefficients except the density and viscosity as described in the "
-                                   "open access paper of Tosi et al. 2015. "
-                                   "The default parameter values are chosen according to Case 1 of the paper. "
+                                   "for all coefficients except the density and viscosity as described in the open access paper of Tosi et al. 2015. "
+                                   "Ammended by including an anisotropic non-linear viscosity and an anisotropic tensor in the paper by Rathmann et.al. 2024"
+                                   "The default parameter values are chosen according to Case 1 of the paper by Tosi et.al."
                                    "All of the values that define this model are read "
-                                   "from a section ``Material model/Tosi model'' in the input file, see "
-                                   "Section~\\ref{parameters:Material_model/Tosi_model}."
+                                   "from a section ``Material model/Tosi Rathmann model'' in the input file, see "
+                                   "Section~\\ref{parameters:Material_model/Tosi_Rathmann_model}."
                                    "\n\n"
                                    "This model uses the following set of equations for the two coefficients that "
-                                   "are non-constant (see equation (6) - (10) of the paper): "
+                                   "are non-constant (see equation (6) - (10) of Tosi et.al. and (19) of Rathmann et.al.: "
                                    "\\begin{align}"
                                    "  \\eta(T,z,\\dot \\epsilon) &= 2\\frac{1}{\\frac{1}{\\eta_{lin}(T,z)}\\frac{1}{\\eta_{plast}(\\dot\\epsilon}}, \\\\"
                                    "  \\rho(T) &= \\left(1-\\alpha (T-T_0)\\right)\\rho_0,"
@@ -472,9 +475,12 @@ namespace aspect
                                    "The linear and plastic viscosity parts are defined as follows:"
                                    "\\begin{align}"
                                    "  \\eta_{lin}(T,z) &= \\exp(-\\ln(\\eta_T)T+\\ln(\\eta_z)z), \\\\"
-                                   "  \\eta_{plast}(\\dot\\epsilon) &= \\eta^{*}+\\frac{\\sigma_y}{\\sqrt(\\dot\\epsilon : \\dot\\epsilon)} "
+                                   "  \\eta_{plast}(\\dot\\epsilon) &= \\eta^{*}+\\eta_0(\\dot\\epsilon) "
                                    "\\end{align} "
                                    "\n\n"
+                                   "The constitutive relationship is ammended according to Rathmann et.al. equation (21), which one can reformulate to:"
+                                   "\\sigma_{ij} = \\eta(T,z,\\dot \\epsilon) A_{ijkl}\\dot\\epsilon_{kl}"
+                                   "with the anisotropic tensor from the CPO_AV_3D material model"
                                    "Note that this model uses the formulation that assumes an incompressible "
                                    "medium despite the fact that the density follows the law "
                                    "$\\rho(T)=\\rho_0(1-\\alpha(T-T_0))$. ")

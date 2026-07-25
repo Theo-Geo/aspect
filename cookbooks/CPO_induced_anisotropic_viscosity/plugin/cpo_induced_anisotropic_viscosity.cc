@@ -311,9 +311,9 @@ namespace aspect
               const double eigvalue_c3 = composition[cpo_bingham_avg_c[3]];
 
               // Calculate the rotation matrix from the euler angles
-              const double phi1 = composition[cpo_bingham_avg_a[0]];
-              const double theta = composition[cpo_bingham_avg_b[0]];
-              const double phi2 = composition[cpo_bingham_avg_c[0]];
+              const double phi1 = composition[cpo_bingham_avg_a[0]] / constants::degree_to_radians;
+              const double theta = composition[cpo_bingham_avg_b[0]]/ constants::degree_to_radians;
+              const double phi2 = composition[cpo_bingham_avg_c[0]] / constants::degree_to_radians;
 
               // get a passive rotation from lab frame to cpo frame 
               const Tensor<2,3> R = Utilities::zxz_euler_angles_to_rotation_matrix(phi1, theta, phi2);
@@ -380,10 +380,10 @@ namespace aspect
                 {
                   // rotate 3d strain-rate into cpo frame and compute scalar anisotropic viscosity
                   Tensor<2,3> strain_rate_cpo = R*strain_rate_3d*transpose(R);
-                  scalar_viscosity =  std::pow(Gamma,(-1/n))*std::pow(CPO_AV_3D::orthotropic_strain_rate_invariant(strain_rate_cpo, F,G,H, M,N,L), ((1-n)/n) );
+                  scalar_viscosity =  std::pow(Gamma,(-1/n))*std::pow(CPO_AV_3D::orthotropic_strain_rate_invariant(strain_rate_cpo, F,G,H, L,M,N), ((1-n)/n) );
                   
                   // calculate the anisotropic tensor for viscosity in CPO frame and rotate into model frame 
-                  const Tensor<2,6> viscosity_tensor = transpose(R_CPO_K) * CPO_AV_3D::viscosity_tensor_cpo_frame(F,G,H, M,N,L) * R_CPO_K;
+                  const Tensor<2,6> viscosity_tensor = transpose(R_CPO_K) * CPO_AV_3D::viscosity_tensor_cpo_frame(F,G,H, L,M,N) * R_CPO_K;
 
                   // save viscosity tensor in stress-strain director to be used in 
                   anisotropic_viscosity->stress_strain_directors[q] = CPO_AV_3D::Kelvin_to_r4_tensor(viscosity_tensor);
@@ -506,7 +506,7 @@ namespace aspect
                   // for the zero-th timestep calculating the scalar viscosity based on the strain-rate -> i.e. isotropic response
                   double edot_ii=std::max(std::max(deviatoric_strain_rate.norm(), 0.),
                                                 min_strain_rate);
-                  out.viscosities[q] = 1/Gamma*std::pow(edot_ii,((1. - n)/n)); // 
+                  out.viscosities[q] = std::pow(Gamma, -1/n)*std::pow(edot_ii,((1. - n)/n)); // 
 
                 }
 
@@ -590,7 +590,7 @@ namespace aspect
                              Patterns::Double(),
                              "Magnitude of reference viscosity.");
           prm.declare_entry ("Minimum strain rate", "1.4e-20", Patterns::Double(),
-                             "Stabilizes strain dependent viscosity. Units: \\si{\\per\\second}");
+                             "Stabilizes strain dependent viscosity. Units: \\si{\\per\\}");
           prm.declare_entry ("Grain size", "1.0e-3",
                              Patterns::Double(),
                              "Olivine anisotropic viscosity is dependent of grain size. Value is given in meters");

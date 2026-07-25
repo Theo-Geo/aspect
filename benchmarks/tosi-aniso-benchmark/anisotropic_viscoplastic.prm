@@ -1,16 +1,11 @@
 include $ASPECT_SOURCE_DIR/benchmarks/tosi-aniso-benchmark/Tosi_base_CPO.prm
 
+set Additional shared libraries            = $ASPECT_SOURCE_DIR/benchmarks/tosi-aniso-benchmark/plugin/libtosi-aniso.so
 set Output directory                       = output-tosi-anisotropic-viscoplastic
 
 subsection Material model
-  subsection Tosi benchmark    
-    # parameter value as in Rathmann et. al. 2024
-    set Rate factor = 100         # chosen to match plume passing lid timing
-    set Power law exponent = 3.5  # chosen as representative for disocation creep
-  end
-
-   subsection CPO-induced Anisotropic Viscosity   
-    set Stress exponent = 3.5  
+  subsection CPO-induced Anisotropic Viscosity   
+    set Fluidity constant   = 100  # chosen to match plume passing lid timing
+    set Stress exponent     = 3.5  # chosen as representative for disocation creep
   end
 end
-
