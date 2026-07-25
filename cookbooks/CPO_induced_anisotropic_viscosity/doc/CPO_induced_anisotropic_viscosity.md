@@ -18,11 +18,15 @@ This cookbook explains how to use the CPO-induced anisotropic viscosity material
 
 Individual crystals of the mineral olivine reorganize their orientations into crystal-preferred orientations (CPO) under deformation. The viscous properties of olivine crystals are direction-dependent (anisotropic), which suggests that the effective viscosity for olivine rocks/aggregates is different when deformations occur in different directions relative to the CPO. This cookbook model computes an anisotropic viscosity based on the CPO evolution predicted by D-Rex ({cite}`fraters_billen_2021_cpo`; {cite}`kaminski2004`) and includes this information in the subsequent modeling process based on the formulation of Király at al., (in rev.).
 
-The constitutive equation for the relationship between the strain rate and stress using the anisotropic viscosity tensor is adapted from {cite:t}`signorelli:etal:2021`:
+### Forward Rheology
+
+Note: In this cookbook, we use one index for vectors (e.g. $\dot{\varepsilon}_{i}$ is a vector representing $\dot{\varepsilon}_{ij}$ in Kelvin notation), and two indices for rank-2 tensors (e.g.$\dot{\varepsilon}_{ij}$). Other variables are scalars.
+
+Our constitutive equation for the relationship between the strain rate and stress using the anisotropic viscosity tensor is adapted from {cite:t}`signorelli:etal:2021`. In Kelvin notation we can write:
 
 ```{math}
 :label: eqn:anisotropic_general_stress
-\dot{\varepsilon}_{i} = \gamma J(\sigma_{pq})^{(n-1)/2} A_{ij} \sigma_{j} \text{ ,}
+\dot{\varepsilon}_{i} = \gamma J^{(n-1)/2} A_{ij} \sigma_{j} \text{ ,}
 ```
 
 where $\gamma$ is the part of fluidity (the inverse of viscosity) which is temperature- and grain-size dependent:
@@ -32,11 +36,11 @@ where $\gamma$ is the part of fluidity (the inverse of viscosity) which is tempe
 \gamma=\gamma_0 exp \left(\frac{-Q}{RT} \right) /d^m \text{ .}
 ```
 
-$\gamma_0=1.1\times 10^{5}$ is the isotropic fluidity, $Q=530$ $kJ/mol$ is the activation energy, $R=8.314$ m$^3 \cdot$ Pa $\cdot$ K$^{−1} \cdot$ mol$^{−1}$ is the gas constant, $d=0.001$ m is the grain size, and $m=0.73$ is the grain size exponent. These values for olivine are taken from rock experiments performed by {cite:t}`hansen:etal:2016` and {cite:t}`HK04`. $J(\sigma_{ij})$ is the yield potential, where $\sigma_{ij}$ is the (anisotropic) stress computed using the tensorial and scalar component of the anisotropic viscosity:
+$\gamma_0=1.1\times 10^{5}$ is the isotropic fluidity, $Q=530$ $kJ/mol$ is the activation energy, $R=8.314$ m$^3 \cdot$ Pa $\cdot$ K$^{−1} \cdot$ mol$^{−1}$ is the gas constant, $d=0.001$ m is the grain size, and $m=0.73$ is the grain size exponent. These values for olivine are taken from rock experiments performed by {cite:t}`hansen:etal:2016` and {cite:t}`HK04`. $J$ is the yield potential (scalar), which is computed with the anisotropic stress $\sigma_{ij}$:
 
 ```{math}
-:label: eqn:equivalent_yield_stress
-J(\sigma_{ij})=(F(\sigma_{22} - \sigma_{33})^2+G(\sigma_{33} - \sigma_{11})^2+H(\sigma_{11} - \sigma_{22})^2+2L\sigma_{23}^2+2M\sigma_{13}^2+2N\sigma_{12}^2)^{1/2}
+:label: eqn:yield_potential
+J=\frac{2}{3}\left[F(\sigma_{22}-\sigma_{33})^2 + G(\sigma_{33}-\sigma_{11})^2 + H(\sigma_{11} - \sigma_{22})^2 + 2L\sigma_{23}^2 + 2M\sigma_{13}^2 + 2N\sigma_{12}^2\right]
 ```
 
 and $A_{ij}$ is the anisotropic tensor of fluidity in Kelvin notation:
@@ -58,18 +62,6 @@ G+H & -H & -G & 0 & 0 & 0 \\
 ```
 
 $J(\sigma_{ij})$ and $A_{ij}$ are computed using Hill coefficients $H, J, K, L, M,$ and $N$ {cite}`hill:1948`, which describe the anisotropic viscous properties of an olivine aggregate and depend on its CPO. We determine the mean CPO orientation from the eigenvectors associated with the largest eigenvalues of the second-order orientation tensor (or covariance matrix) for all three symmetry axes. The corresponding eigenvalues quantify the dispersion of orientations around these mean orientation {cite}`bingham:1974`. The relationship between the 9 eigenvalues (3 for each axis) and Hill coefficients is derived using regression analysis on a texture database constructed with olivine textures from laboratory experiments, shear box models, and subduction models (Kiraly et al., in rev., the data used for this paper is published through Zenodo {cite}`kiraly:etal:2026`). The 9 coefficients and 1 constant for each of the Hill coefficients are given as input in the parameter file. The default values and the equation to compute the Hill coefficients from the eigenvalues (e.g. $a_1, a_2, a_3$ are the eigenvalues of the orientation tensor for a-axis, where $a_1$ is the largest eigen value) are shown below:
-```{math}
-:label: eqn:hill_coefficients
-F = 0.592 a_1^2 - 0.832 a_1 - 0.001 a_2 - \frac{0.000}{a_3} + 0.380 b_1^2 - 0.533 b_1 + 0.468 b_2 - \frac{0.001}{b_3} - 1.249 c_1^2 + 1.075 c_1 - 0.168 c_2 + \frac{0.003}{c_3} + 0.52 \\
-G = -1.695 a_1^2 + 1.336 a_1 - 0.184 a_2 + \frac{0.000}{a_3} + 0.750 b_1^2 + 0.691 b_1 + 0.377 b_2 - \frac{0.002}{b_3} - 0.670 c_1^2 - 0.552 c_1 - 0.428 c_2 + \frac{0.003}{c_3} + 0.26 \\
-H = -1.140 a_1^2 + 1.353 a_1 + 0.751 a_2 - \frac{0.002}{a_3} - 0.256 b_1^2 - 1.006 b_1 - 0.116 b_2 + \frac{0.003}{b_3} + 0.648 c_1^2 - 0.031 c_1 - 0.080 c_2 + \frac{0.006}{c_3} + 0.75 \\
-L = -3.511 a_1^2 + 2.686 a_1 + 0.360 a_2 - \frac{0.001}{a_3} + 3.948 b_1^2 - 3.816 b_1 - 0.779 b_2 + \frac{0.004}{b_3} + 4.122 c_1^2 - 2.483 c_1 - 1.320 c_2 + \frac{0.002}{c_3} + 2.00 \\
-M = 4.537 a_1^2 - 3.228 a_1 + 0.276 a_2 + \frac{0.007}{a_3} - 7.447 b_1^2 + 5.764 b_1 - 1.403 b_2 - \frac{0.032}{b_3} + 2.968 c_1^2 - 3.435 c_1 - 2.266 c_2 + \frac{0.122}{c_3} + 2.44 \\
-N = 7.873 a_1^2 - 7.934 a_1 - 2.588 a_2 + \frac{0.030}{a_3} + 7.606 b_1^2 - 5.469 b_1 - 0.348 b_2 + \frac{0.064}{b_3} - 1.788 c_1^2 + 2.255 c_1 + 3.023 c_2 - \frac{0.103}{c_3} + 3.70
-```
-
-In this material model plugin, strain rate, density, temperature, and other parameters are taken as input to compute the anisotropic viscosity, which is passed into the Stokes system to compute the stress. As a result, we adapt {math:numref}`eqn:anisotropic_general_stress` to be:
-
 ```{math}
 :label: eqn:hill_coefficients
 F = 0.592 a_1^2 - 0.832 a_1 - 0.001 a_2 - \frac{0.000}{a_3} + 0.380 b_1^2 - 0.533 b_1 + 0.468 b_2 - \frac{0.001}{b_3} - 1.249 c_1^2 + 1.075 c_1 - 0.168 c_2 + \frac{0.003}{c_3} + 0.52 \\
@@ -134,7 +126,7 @@ $R'$ and $R_K'$ is the transpose of matrix $R$ and $R_K$ respectively. We save $
 
 ### Analytical inversion
 
-The inverse rheology of an orthotropic non-linear rheology can be derived from the symmetry of the strain-rate tensor {cite}`rathmann:lilien:2022`. Writing the orthotropic rheology and its inversion in the CPO reference frame we can compare the Hill coefficients to the fluidity coefficients or enhancement factors of {cite}`rathmann:lilien:2022`. The reformulated inverse rheology in terms of Hill coefficients  in Kelvin notation then becomes:
+The inverse rheology of an orthotropic non-linear rheology can be derived from the symmetry of the strain-rate tensor {cite}`rathmann:lilien:2022`. Writing the orthotropic rheology and its inversion in the CPO reference frame we can compare the Hill coefficients to the fluidity coefficients or enhancement factors of {cite}`rathmann:lilien:2022`. The reformulated inverse rheology in terms of Hill coefficients in Kelvin notation then becomes:
 
 ```{math}
 :label: eqn:analytical_inversion_orthotropic_rheology
@@ -168,7 +160,7 @@ Here we use the convention $H_1=F,H_2=G,H_3=H$, $H_4=L,H_5=M,H_6=N$ and the shif
 \Gamma =  4\sum_i H_{j_i}H_{k_i} \text{ .}
 ```
 
-In the isotropic case ($H_i=0.5$, $H_{i+3}=1.5$) we then have a flowlaw of the form,
+In the isotropic case ($H_i=0.5$, $H_{i+3}=1.5$) we then have a flow law of the form,
 ```{math}
 :label: eqn:isotropic_inverse_flow_law
 \begin{aligned}
@@ -191,7 +183,7 @@ Since the AV material model computes viscosity based on the evolving CPO stored 
 ```{literalinclude} min_particles_per_cell.part.prm
 ```
 
-- **CPO particle property**: The CPO particle property must be stored for use by the AV model. This requires enabling the particle and crystal preferred orientation postprocessors and the relevant subsections for them, including the CPO Bingham Average plugin, which calculates the Hill coefficients. We set the mobility, nucleation efficiently, and threshold GBS values following {cite:t}`hansen:etal:2016`, for grain boundary mobility, grain nucleation, and grain boundary sliding, respectively.
+- **CPO particle property**: The CPO particle property must be stored for use by the AV model. This requires enabling the particle and crystal preferred orientation postprocessors and the relevant subsections for them, including the CPO Bingham Average plugin, which calculates the Hill coefficients. We set the mobility, nucleation efficiency, and threshold GBS values following {cite:t}`hansen:etal:2016`, for grain boundary mobility, grain nucleation, and grain boundary sliding, respectively:
 
 ```{literalinclude} cpo_particle_property.part.prm
 ```
@@ -203,7 +195,7 @@ Note: These settings are similar to those used for simulations involving CPO alo
 ```{literalinclude} compositional_field.part.prm
 ```
 
-In the `CPO induced Anisotropic Viscosity` material model subsection, all parameters have reasonable default values and do not need to be manually specified unless customization is needed. For non-dimensional cases it is possible to define the Grain size $d$, the Grain size exponent $m$, the Fluidity constant $\gamma_0$, the Activation energy $Q$, the non-linear stress exponent $n$ and if the analytical inversion or the iterative inversion should be used.
+In the `CPO induced Anisotropic Viscosity` material model subsection, all parameters have reasonable default values and do not need to be manually specified unless customization is needed. It is possible to define the grain size $d$, the grain size exponent $m$, the fluidity constant $\gamma_0$, the activation energy $Q$, the non-linear stress exponent $n$ and if the analytical inversion or the iterative inversion should be used.
 
 This shear box model uses an additional postprocessor, anisotropic stress, which is also implemented in this cookbook. It outputs a 3-by-3 matrix that can be visualized as a tensor, similar to the standard stress postprocessor. With the anisotropic viscosity material model, applying simple shear produces deformation in multiple directions. As a result, the anisotropic stress tensor appears as elongated and slightly tilted glyphs (indicating the principal stress directions), in contrast to the isotropic stress tensor (see figure below).
 
