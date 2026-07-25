@@ -75,25 +75,23 @@ namespace aspect
         {
           /**
            * As described in Tosi et al (2015), the viscosity \eta is computed as the
-           * harmonic average of a linear and nonlinear part.
+           * harmonic average of a linear and nonlinear plastic part.
            *
            * The linear part is calculated as follows
            * (see below for the meaning of the used parameter names):
            * $\eta_{lin}(T,z) = \exp(-\ln(\text{eta\_T} * T + \ln(\text{eta\_Z}) * z)$
            * while the strain rate dependent nonlinear part is computed as:
-           * $\eta_{plast}(\dot\epsilon) = \text{eta\_asterisk} + \frac{\text{sigma\_yield}}{\sqrt(\dot\epsilon:\dot\epsilon)}$
+           * $\eta_{plast}(\dot\epsilon) = \text{eta\_asterisk} + \text{sigma\_yield} * \text{anisotropic\_viscosity}$
            */
           
           //set up additional output for the derivatives
           const std::shared_ptr<MaterialModel::MaterialModelDerivatives<dim>> derivatives
             = out.template get_additional_output_object<MaterialModel::MaterialModelDerivatives<dim>>();
           
-          base_model->evaluate(in, out); 
+          cpo_av->evaluate(in, out); 
 
-          const std::vector<double> scalar_viscosity_vector = out.viscosities;
+          const std::vector<double> anisotropic_viscosity = out.viscosities;
 
-          // double av_cpo_viscosity = 1.0; 
-          
           for (unsigned int i=0; i < in.n_evaluation_points(); ++i)
             {
               if (in.requests_property(MaterialModel::MaterialProperties::viscosity))
@@ -103,7 +101,7 @@ namespace aspect
                                                   in.composition[i],
                                                   in.strain_rate[i],
                                                   in.position[i], 
-                                                  scalar_viscosity_vector[i]);
+                                                  anisotropic_viscosity[i]);
                 }
 
               out.densities[i] = reference_rho * (1.0 - thermal_alpha * (in.temperature[i] - reference_T));
@@ -120,74 +118,6 @@ namespace aspect
               // change in compositional field c at point i.
               for (unsigned int c=0; c<in.composition[i].size(); ++c)
                 out.reaction_terms[i][c] = 0.0;
-
-              // If requested compute viscosity derivatives. This is only important
-              // if using the Newton solver.
-              if (derivatives != nullptr && in.requests_property(MaterialModel::MaterialProperties::viscosity))
-                {
-                  if (use_analytical_derivative)
-                    {
-                      if (in.strain_rate[i].norm() == 0)
-                        {
-                          derivatives->viscosity_derivative_wrt_strain_rate[i] = 0;
-                          derivatives->viscosity_derivative_wrt_pressure[i] = 0;
-                        }
-                      else
-                        {
-                          const double deviator_strain_rate_norm = in.strain_rate[i].norm();
-                          const double part1 = (eta_asterisk * deviator_strain_rate_norm + sigma_yield);
-
-                          derivatives->viscosity_derivative_wrt_strain_rate[i] = -(0.5*out.viscosities[i]*out.viscosities[i])
-                                                                                 * (sigma_yield/(part1 * part1 * deviator_strain_rate_norm)) * in.strain_rate[i];
-                          derivatives->viscosity_derivative_wrt_pressure[i] = 0;
-                        }
-                    }
-                  else
-                    {
-                      // finite difference derivative
-                      const double finite_difference_accuracy = 1e-7;
-
-                      SymmetricTensor<2,dim> &deta = derivatives->viscosity_derivative_wrt_strain_rate[i];
-
-                      // derivative in xx direction
-                      SymmetricTensor<2,dim> dstrain_rate = in.strain_rate[i];
-                      dstrain_rate[0][0] += std::fabs(in.strain_rate[i][0][0]) * finite_difference_accuracy;
-                      const double eta_zero_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], scalar_viscosity_vector[i]);
-                      deta[0][0] = eta_zero_zero - out.viscosities[i];
-
-                      if (dstrain_rate[0][0] != 0)
-                        deta[0][0] /= std::fabs(in.strain_rate[i][0][0]) * finite_difference_accuracy;
-                      else
-                        deta[0][0] = 0;
-
-                      // derivative in xy direction
-                      dstrain_rate = in.strain_rate[i];
-                      // dstrain_rate in yx direction is multiplied by 0.5, because the symmetric tensor
-                      // is modified by 0.5 in xy and yx direction simultaneously and we compute the combined
-                      // derivative
-                      dstrain_rate[1][0] += 0.5 * std::fabs(in.strain_rate[i][1][0]) * finite_difference_accuracy;
-                      const double eta_one_zero = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], scalar_viscosity_vector[i]);
-                      deta[1][0] = eta_one_zero - out.viscosities[i];
-
-                      if (dstrain_rate[1][0] != 0)
-                        deta[1][0] /= std::fabs(in.strain_rate[i][1][0]) * finite_difference_accuracy;
-                      else
-                        deta[1][0] = 0;
-
-                      // derivative in yy direction
-                      dstrain_rate = in.strain_rate[i];
-                      dstrain_rate[1][1] += std::fabs(in.strain_rate[i][1][1]) * finite_difference_accuracy;
-                      const double eta_one_one = viscosity(in.temperature[i], in.pressure[i], in.composition[i], dstrain_rate, in.position[i], scalar_viscosity_vector[i]);
-                      deta[1][1] = eta_one_one - out.viscosities[i];
-
-                      if (dstrain_rate[1][1] != 0)
-                        deta[1][1] /= std::fabs(in.strain_rate[i][1][1]) * finite_difference_accuracy;
-                      else
-                        deta[1][1] = 0;
-
-                      derivatives->viscosity_derivative_wrt_pressure[i] = 0;
-                    }
-                }
 
             }
 
@@ -249,12 +179,7 @@ namespace aspect
          * according to equation (8) of the paper.
          */
         double viscoplast(const double eta_asterisk,
-                          const double stress_y,
-                          const double n, 
-                          const double A, 
-                          const double aniso_visc,
-                          const double strainratenorm
-                          ) const;
+                          const double aniso_visc) const;
 
         /**
          * The density at reference temperature
@@ -300,24 +225,6 @@ namespace aspect
         double eta_asterisk;
 
         /*
-         * The constant yield stress that is used in the
-         * plastic viscosity formula
-         */
-        double sigma_yield;
-
-        
-        /*
-         * non-linear stress exponent 
-         * used in the viscous limit
-         */
-        double power_law_exponent;
-
-        /*
-         * Rate factor used for the non-linear viscosity
-         */
-        double rate_factor;
-
-        /*
          * The lower viscosity cut-off value
          */
         double eta_minimum;
@@ -333,15 +240,9 @@ namespace aspect
         double eta_initial;
 
         /**
-         * Whether to use analytical or finite-difference viscosity derivatives
-         * if the Newton solver is used.
-         */
-        bool use_analytical_derivative;
-
-        /**
          * Pointer to the material model used as the base model
          */
-        std::unique_ptr<MaterialModel::Interface<dim>> base_model;
+        std::unique_ptr<MaterialModel::Interface<dim>> cpo_av;
 
     };
 
@@ -371,18 +272,11 @@ namespace aspect
       double viscosity = 0.0;
       const double visc_linear = viscolin(eta_T,eta_Z,temperature,0);
 
-      if (eta_asterisk == 0.0 && sigma_yield == 0.0)
-        {
-          viscosity = visc_linear;
-        }
-      else
-        {
-          const double visc_plastic = viscoplast(eta_asterisk, sigma_yield, power_law_exponent, rate_factor, aniso_viscosity, strain_rate.norm());
+      const double visc_plastic = viscoplast(eta_asterisk, aniso_viscosity);
 
-          // Compute the harmonic average (equation (6) of the paper)
-          viscosity = 2.0 / ((1.0 / visc_linear) + (1.0 / visc_plastic));
-        }
-
+      // Compute the harmonic average (equation (6) of the paper)
+      viscosity = 2.0 / ((1.0 / visc_linear) + (1.0 / visc_plastic));
+  
       // Cut-off the viscosity by user-defined values to avoid possible very large viscosity ratios
       viscosity = std::max(std::min(viscosity,eta_maximum),eta_minimum);
 
@@ -413,28 +307,22 @@ namespace aspect
     double
     TosiMaterial<dim>::
     viscoplast(const double etaasterisk,
-               const double stressy,
-               const double n,
-               const double A,
-               const double aniso_visc, 
-               const double strainratenorm) const
+               const double aniso_visc) const
     { 
 
-      return etaasterisk + (stressy * std::pow(A, 0.0-1.0/n) * aniso_visc);
-      //  ) std::pow(strainratenorm, (1.0/n-1.0))
-      // return etaasterisk + (stressy*aniso_viscosity);
+      return etaasterisk + aniso_visc;
     }
 
     /**
-     * Functions relevant for properties 
-     * additional outputs, base model 
+     * initialize cpo av model to set the assembler 
+     * create additional named outputs for Anisotropic tensor
      */
 
     template <int dim>
     void
     TosiMaterial<dim>::initialize()
     {
-      base_model->initialize();
+      cpo_av->initialize();
     }
     
     template <int dim>
@@ -442,9 +330,8 @@ namespace aspect
     TosiMaterial<dim>::
     is_compressible () const
     {
-      AssertThrow(!(base_model->is_compressible()), 
-        ExcMessage("You may not use a compressible material model"
-                  " as the base model for the Tosi benchmark."));
+      AssertThrow(!(cpo_av->is_compressible()), 
+        ExcMessage("CPO material material model is not allowed to be compressible"));
       return false;
     }
 
@@ -452,7 +339,7 @@ namespace aspect
     void
     TosiMaterial<dim>::create_additional_named_outputs (MaterialModel::MaterialModelOutputs<dim> &out) const
     {
-      base_model->create_additional_named_outputs(out);
+      cpo_av->create_additional_named_outputs(out);
     }
 
     template <int dim>
@@ -462,7 +349,7 @@ namespace aspect
       // Default values are for Case 1 of Tosi et al. (2015).
       prm.enter_subsection("Material model");
       {
-        prm.enter_subsection("Tosi benchmark");
+        prm.enter_subsection("Tosi Rathmann benchmark");
         {
           prm.declare_entry ("Reference density", "1",
                              Patterns::Double (0),
@@ -497,26 +384,10 @@ namespace aspect
                              Patterns::Double (0),
                              "The value of the pressure viscosity parameter $\\eta_Z$, "
                              "as used in equation (7) of the paper.");
-          prm.declare_entry ("Yield stress", "0",
-                             Patterns::Double (0),
-                             "The value of the plastic viscosity yield stress $\\sigma_yield$, "
-                             "as used in equation (8) of the paper.");
           prm.declare_entry ("Nonlinear viscosity constant", "0",
                              Patterns::Double (0),
                              "The value of the plastic viscosity constant $\\eta_asterisk$, "
                              "as used in equation (8) of the paper.");
-          prm.declare_entry ("Use analytical derivative", "false",
-                             Patterns::Bool (),
-                             "Whether to use the analytical or the finite difference derivative for the Newton method.");
-          prm.declare_entry("Base model","simple",
-                            Patterns::Selection(MaterialModel::get_valid_model_names_pattern<dim>()),
-                            "Name of the material model from which the evaluate function is called.");
-          prm.declare_entry("Power law exponent","1e5",
-                            Patterns::Double (0),
-                            "The value of the stress exponent in equ. (20) of Rathmann et. al 2024."); 
-          prm.declare_entry("Rate factor", "1",
-                            Patterns::Double (0),
-                            "The value of the rate factor in equ. (20) of Rathmann et. al 2024.");  
         }
         prm.leave_subsection();
       }
@@ -530,7 +401,7 @@ namespace aspect
     {
       prm.enter_subsection("Material model");
       {
-        prm.enter_subsection("Tosi benchmark");
+        prm.enter_subsection("Tosi Rathmann benchmark");
         {
           reference_rho              = prm.get_double ("Reference density");
           reference_T                = prm.get_double ("Reference temperature");
@@ -539,24 +410,16 @@ namespace aspect
           thermal_alpha              = prm.get_double ("Thermal expansion coefficient");
           eta_T                      = prm.get_double ("Thermal viscosity parameter");
           eta_Z                      = prm.get_double ("Pressure viscosity parameter");
-          sigma_yield                = prm.get_double ("Yield stress");
           eta_asterisk               = prm.get_double ("Nonlinear viscosity constant");
           eta_minimum                = prm.get_double ("Minimum viscosity");
           eta_maximum                = prm.get_double ("Maximum viscosity");
           eta_initial                = prm.get_double ("Initial viscosity");
-          use_analytical_derivative  = prm.get_bool ("Use analytical derivative");
-          rate_factor                = prm.get_double ("Rate factor");
-          power_law_exponent         = prm.get_double ("Power law exponent");
-
-          AssertThrow( prm.get("Base model") != "Tosi benchmark",
-                       ExcMessage("You may not use ``Tosi benchmark'' as the base model for "
-                                  "the Tosi benchmark.") );
 
           // create the base model and initialize its SimulatorAccess base
           // class; it will get a chance to read its parameters below after we
           // leave the current section
-          base_model = MaterialModel::create_material_model<dim>(prm.get("Base model"));
-          if (SimulatorAccess<dim> *sim = dynamic_cast<SimulatorAccess<dim>*>(base_model.get()))
+          cpo_av = MaterialModel::create_material_model<dim>("CPO-induced anisotropic viscosity");
+          if (SimulatorAccess<dim> *sim = dynamic_cast<SimulatorAccess<dim>*>(cpo_av.get()))
             sim->initialize_simulator (this->get_simulator());
 
         }
@@ -565,7 +428,7 @@ namespace aspect
       prm.leave_subsection();
 
       // Declare dependencies on solution variables
-      this->model_dependence.viscosity = (sigma_yield != 0.0) ? MaterialModel::NonlinearDependence::strain_rate | MaterialModel::NonlinearDependence::temperature | MaterialModel::NonlinearDependence::pressure : MaterialModel::NonlinearDependence::temperature | MaterialModel::NonlinearDependence::pressure;
+      this->model_dependence.viscosity = MaterialModel::NonlinearDependence::strain_rate | MaterialModel::NonlinearDependence::temperature | MaterialModel::NonlinearDependence::pressure;
       this->model_dependence.density = MaterialModel::NonlinearDependence::temperature;
       this->model_dependence.compressibility = MaterialModel::NonlinearDependence::none;
       this->model_dependence.specific_heat = MaterialModel::NonlinearDependence::none;
@@ -574,184 +437,10 @@ namespace aspect
       /**
       * base model syntax -> get model dependencies
       */
-      base_model->parse_parameters(prm);
-      this->model_dependence = base_model->get_model_dependence();
+      cpo_av->parse_parameters(prm);
+      this->model_dependence = cpo_av->get_model_dependence();
 
     }
-
-
-    /**
-     * A postprocessor that computes some statistics about the
-     * rate of viscous dissipation, the rate of work done against gravity
-     * and the error between the two. These diagnostic quantities
-     * are reported in the Tosi et al. (2015) paper for a visco-plastic
-     * 2D thermal convection model.
-     *
-     * @ingroup Postprocessing
-     */
-    template <int dim>
-    class TosiPostprocessor : public Postprocess::Interface<dim>, public ::aspect::SimulatorAccess<dim>
-    {
-      public:
-        /**
-         * Evaluate the solution for statistics on the rate of viscous dissipation,
-         * rate of work and the error between the two.
-         */
-        std::pair<std::string,std::string>
-        execute (TableHandler &statistics) override;
-    };
-
-    template <int dim>
-    std::pair<std::string,std::string>
-    TosiPostprocessor<dim>::execute (TableHandler &statistics)
-    {
-      AssertThrow(this->get_geometry_model().natural_coordinate_system() == aspect::Utilities::Coordinates::CoordinateSystem::cartesian,
-                  ExcMessage("The current calculation of rate of work only makes sense in a Cartesian geometry."));
-
-      AssertThrow(Plugins::plugin_type_matches<const TosiMaterial<dim>>(this->get_material_model()),
-                  ExcMessage("The current calculation of viscous dissipation is only for incompressible models "
-                             "and specifically computes the difference between work and dissipation as requested "
-                             "in the paper of Tosi et al. 2015."));
-
-      const QGauss<dim> quadrature_formula (this->get_fe()
-                                            .base_element(this->introspection().base_elements.velocities)
-                                            .degree+1);
-
-      const unsigned int n_q_points = quadrature_formula.size();
-      std::vector<Tensor<1,dim>> velocities(n_q_points);
-
-      FEValues<dim> fe_values (this->get_mapping(),
-                               this->get_fe(),
-                               quadrature_formula,
-                               update_values   |
-                               update_quadrature_points |
-                               update_gradients |
-                               update_JxW_values);
-
-      // the local integral values of rate of viscous dissipation and work against gravity
-      double local_dissipation_integral = 0.0;
-      double local_work = 0.0;
-
-      // the values of the compositional fields are stored as blockvectors for each field
-      // we have to extract them in this structure
-      std::vector<std::vector<double>> prelim_composition_values (this->n_compositional_fields(),
-                                                                   std::vector<double> (n_q_points));
-
-      typename MaterialModel::Interface<dim>::MaterialModelInputs in(n_q_points,
-                                                                     this->n_compositional_fields());
-      typename MaterialModel::Interface<dim>::MaterialModelOutputs out(n_q_points,
-                                                                       this->n_compositional_fields());
-      in.requested_properties = MaterialModel::MaterialProperties::viscosity;
-
-      // loop over active, locally owned cells and
-      // extract material model input and compute integrals
-      for (const auto &cell : this->get_dof_handler().active_cell_iterators())
-        if (cell->is_locally_owned())
-          {
-            fe_values.reinit (cell);
-
-            // retrieve velocities
-            fe_values[this->introspection().extractors.velocities].get_function_values (this->get_solution(),
-                                                                                        velocities);
-
-            // retrieve the input for the material model
-            in.position = fe_values.get_quadrature_points();
-
-            fe_values[this->introspection().extractors.pressure].get_function_values (this->get_solution(),
-                                                                                      in.pressure);
-
-            fe_values[this->introspection().extractors.temperature].get_function_values (this->get_solution(),
-                                                                                         in.temperature);
-
-            for (unsigned int c=0; c<this->n_compositional_fields(); ++c)
-              fe_values[this->introspection().extractors.compositional_fields[c]].get_function_values
-              (this->get_solution(),prelim_composition_values[c]);
-
-            for (unsigned int i=0; i<n_q_points; ++i)
-              {
-                for (unsigned int c=0; c<this->n_compositional_fields(); ++c)
-                  in.composition[i][c] = prelim_composition_values[c][i];
-              }
-
-            fe_values[this->introspection().extractors.velocities].get_function_symmetric_gradients (this->get_solution(),
-                in.strain_rate);
-
-            // get the output from the material model
-            this->get_material_model().evaluate(in, out);
-
-            // calculate the local viscous dissipation integral and local rate of work against gravity
-            for (unsigned int q = 0; q < n_q_points; ++q)
-              {
-                const SymmetricTensor<2,dim> strain_rate_dev = deviator(in.strain_rate[q]);
-                local_dissipation_integral += 2.0 * out.viscosities[q] * strain_rate_dev * strain_rate_dev * fe_values.JxW(q);
-                local_work += in.temperature[q] * velocities[q][dim-1] * fe_values.JxW(q);
-              }
-          }
-
-      // compute the integrals on the whole domain
-      const double viscous_dissipation
-        = Utilities::MPI::sum (local_dissipation_integral, this->get_mpi_communicator());
-
-      const double work
-        = Utilities::MPI::sum(local_work, this->get_mpi_communicator());
-
-      // compute the percentage error between rate of dissipation (divided by the surface rayleigh number of the Tosi et al. (2015)
-      // benchmark (Ra=100)) and rate of work (see equation (21) of the paper)
-      const double error = 100.0 * (std::abs(work - (viscous_dissipation / 100.0)) / std::max(work, viscous_dissipation / 100.0));
-
-      if (this->convert_output_to_years() == true)
-        {
-          // fill statistics file
-          // make sure that the columns filled by this object
-          // all show up with sufficient accuracy and in scientific notation
-          statistics.add_value ("Viscous dissipation (J/yr)", viscous_dissipation * year_in_seconds);
-          statistics.set_precision ("Viscous dissipation (J/yr)", 8);
-          statistics.set_scientific ("Viscous dissipation (J/yr)", true);
-          statistics.add_value ("Rate of work (Km/yr)", work * year_in_seconds);
-          statistics.set_precision ("Rate of work (Km/yr)", 8);
-          statistics.set_scientific ("Rate of work (Km/yr)", true);
-          statistics.add_value ("Error", error);
-          statistics.set_precision ("Error", 8);
-          statistics.set_scientific ("Error", true);
-        }
-      else
-        {
-          // fill statistics file
-          // make sure that the columns filled by this object
-          // all show up with sufficient accuracy and in scientific notation
-          statistics.add_value ("Viscous dissipation (W)", viscous_dissipation);
-          statistics.set_precision ("Viscous dissipation (W)", 8);
-          statistics.set_scientific ("Viscous dissipation (W)", true);
-          statistics.add_value ("Rate of work (W)", work);
-          statistics.set_precision ("Rate of work (W)", 8);
-          statistics.set_scientific ("Rate of work (W)", true);
-          statistics.add_value ("Error", error);
-          statistics.set_precision ("Error", 8);
-          statistics.set_scientific ("Error", true);
-        }
-
-      std::ostringstream output;
-      output.precision(3);
-      if (this->convert_output_to_years() == true)
-        output << viscous_dissipation *year_in_seconds
-               << " J/yr "
-               << work *year_in_seconds
-               << " J/yr "
-               << error
-               << " error";
-      else
-        output << viscous_dissipation
-               << " W "
-               << work
-               << " W "
-               << error
-               << " error";
-
-      return std::pair<std::string, std::string> ("Viscous dissipation, rate of work, error:",
-                                                  output.str());
-    }
-
-
   }
 }
 
@@ -789,18 +478,5 @@ namespace aspect
                                    "Note that this model uses the formulation that assumes an incompressible "
                                    "medium despite the fact that the density follows the law "
                                    "$\\rho(T)=\\rho_0(1-\\alpha(T-T_0))$. ")
-    ASPECT_REGISTER_POSTPROCESSOR(TosiPostprocessor,
-                                  "TosiPostprocessor",
-                                  "A postprocessor that computes the viscous dissipation"
-                                  "for the whole domain as: "
-                                  "$\\left<\\Phi\\right>=\\int_{V} \\tau : \\dot{\\epsilon}dV$ "
-                                  "= $\\int_{V} 2\\mu\\dot{\\epsilon}:\\dot{\\epsilon} dV$. "
-                                  "Besides the dissipation, for the Tosi et al. (2015) benchmark "
-                                  "the rate of work against gravity is "
-                                  "calculated, as well as the percentage error between the two: "
-                                  "$W$ = $\\int_{V} T u_{y} dV$ and "
-                                  "$\\delta$ = $ \\frac{|W - \\frac{\\left<\\Phi\\right>}{Ra}|}{\\max\\left(\\left<W\\right>,\\frac{\\left<\\Phi\\right>}{Ra}\\right)}$. "
-                                  "This error W should tend to zero if in steady state the thermal energy is accurately preserved."
-                                  "Note that this postprocessor only makes sense for box geometries.")
   }
 }

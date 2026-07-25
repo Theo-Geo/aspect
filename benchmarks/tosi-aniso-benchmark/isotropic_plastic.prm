@@ -17,15 +17,9 @@ subsection Compositional fields
 end
 
 subsection Material model
-  subsection Tosi benchmark
-  
-    set Rate factor         = 1   # default
-    set Power law exponent  = 1e5 # default, represents n \to \infty
-    set Base model          = CPO-induced anisotropic viscosity
-  end 
-
   subsection CPO-induced Anisotropic Viscosity 
-    set Stress exponent     = 1e5
+    set Fluidity constant   = 1 
+    set Stress exponent     = 1e5 # limit where n -> infty 
   end
 
 end

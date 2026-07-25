@@ -156,7 +156,7 @@ namespace aspect
       std::vector<int> ki = {2,0,1}; // tuple of indices shifted by two
 
       SymmetricTensor<2,6> visc_tensor; 
-      std::vector<double> Hi = {F, G, H, M, N, L};
+      std::vector<double> Hi = {F, G, H, L, M, N};
       
       const double gamma = 4*(Hi[2]*Hi[1] + Hi[0]*Hi[2] + Hi[0]*Hi[1]); 
       

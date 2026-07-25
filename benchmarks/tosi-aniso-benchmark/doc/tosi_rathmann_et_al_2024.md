@@ -85,7 +85,9 @@ In the principal frame we impose that the anisotropic tensor exhibits orthotropi
 ```
 In the isotropic case the Hill coefficients are prescribed $H_i =0.5$ and $H_{i+3}=1.5$ for $i=1,2,3$, which reduces equation {math:numref}`eq:anisotropic-viscosity` to equation {math:numref}`eq:tosi-isotropic-viscosity` only with the deviatoric strain-rate $\dot{\boldsymbol{\epsilon}}^d$. As the Tosi benchmarks use the bousinesq formulation they are equivalent $\dot{\boldsymbol{\epsilon}} = \dot{\boldsymbol{\epsilon}}^d$. Similarly, the anisotropic tensor projects the strain-rate to its deviator $\mathcal{V}:\dot{\boldsymbol{\epsilon}} = \dot{\boldsymbol{\epsilon}}^d$, which again is the same.
 
+## Implementation 
 
+The tosi-aniso.cc plugin is a reduced version of tosi.cc, which omits depth dependence, but therefore includes anisotropic viscosity. The Anisotropic tensor and the anisotropic viscosity computed by using the CPO_AV_3D material model from cookbooks/CPO_induced_anisotropic_viscosity/plugin/cpo_induced_anisotropic_viscosity.cc as a base model. 
 
 ## Case Comparison
 
