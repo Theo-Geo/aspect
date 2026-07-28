@@ -3342,7 +3342,7 @@ namespace aspect
         }
         else
         {
-          advection_quaternion[0] = tolerance*std::sqrt(w_squared);
+          advection_quaternion[0] = Utilities::fixed_power<2>(tolerance);// std::sqrt(w_squared);
           advection_quaternion[1] = 0.5*tolerance*std::copysign(1.0,rotation_matrix[2][1]-rotation_matrix[1][2])*std::sqrt(rotation_matrix[0][0]-rotation_matrix[1][1]-rotation_matrix[2][2]+1);
           advection_quaternion[2] = 0.5*tolerance*std::copysign(1.0,rotation_matrix[0][2]-rotation_matrix[2][0])*std::sqrt(-rotation_matrix[0][0]+rotation_matrix[1][1]-rotation_matrix[2][2]+1); 
           advection_quaternion[3] = 0.5*tolerance*std::copysign(1.0,rotation_matrix[1][0]-rotation_matrix[0][1])*std::sqrt(-rotation_matrix[0][0]-rotation_matrix[1][1]+rotation_matrix[2][2]+1);

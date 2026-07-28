@@ -71,20 +71,36 @@ namespace aspect
                                                                         n_samples,
                                                                         this->random_number_generator);
 
-            if (use_rotmat == true)
+            if (output_rotation == "full matrix")
               {
                 const std::array<std::array<double,6>,3> bingham_average = compute_bingham_average(weighted_rotation_matrices, std::integral_constant<int,6> {});
                 for (unsigned int i = 0; i < 3; ++i)
                   for (unsigned int j = 0; j < 6; ++j)
                     data.emplace_back(bingham_average[i][j]);
               }
-            else
+            else if (output_rotation == "euler angles")
               {
                 const std::array<std::array<double,4>,3> bingham_average = compute_bingham_average(weighted_rotation_matrices, std::integral_constant<int,4> {});
                 for (unsigned int i = 0; i < 3; ++i)
                   for (unsigned int j = 0; j < 4; ++j)
                     data.emplace_back(bingham_average[i][j]);
               }
+            else if (output_rotation == "advection quaternion")
+              {
+                const std::pair<std::array<double, 4>, std::array<std::array<double,2>,3>> bingham_average = compute_bingham_average(weighted_rotation_matrices, std::integral_constant<int,2> {});
+
+                for (unsigned int i = 0; i < 4; ++i)
+                  data.emplace_back(bingham_average.first[i]);
+
+                for (unsigned int i = 0; i < 3; ++i)
+                  for (unsigned int j = 0; j < 2; ++j)
+                    data.emplace_back(bingham_average.second[i][j]);
+              }
+            else 
+              {
+                AssertThrow(output_rotation == "none", ExcMessage("not a valid output type"));
+              }
+
           }
       }
 
@@ -112,25 +128,36 @@ namespace aspect
 
                 const std::vector<Tensor<2,3>> weighted_rotation_matrices = Utilities::rotation_matrices_random_draw_volume_weighting(volume_fractions_grains, rotation_matrices_grains, n_samples, this->random_number_generator);
 
-                if (use_rotmat == true)
+                if (output_rotation == "full matrix")
                   {
                     std::array<std::array<double,6>,3> bingham_average = compute_bingham_average(weighted_rotation_matrices, std::integral_constant<int,6> {});
 
                     for (unsigned int i = 0; i < 3; ++i)
                       for (unsigned int j = 0; j < 6; ++j)
-                        {
-                          data[this->data_position + mineral_i*18 + i*6 + j] = bingham_average[i][j];
-                        }
+                        data[this->data_position + mineral_i*18 + i*6 + j] = bingham_average[i][j];
                   }
-                else
+                else if (output_rotation == "euler angles")
                   {
                     std::array<std::array<double,4>,3> bingham_average = compute_bingham_average(weighted_rotation_matrices, std::integral_constant<int,4> {});
 
                     for (unsigned int i = 0; i < 3; ++i)
                       for (unsigned int j = 0; j < 4; ++j)
-                        {
-                          data[this->data_position + mineral_i*12 + i*4 + j] = bingham_average[i][j];
-                        }
+                        data[this->data_position + mineral_i*12 + i*4 + j] = bingham_average[i][j];
+                  }
+                else if (output_rotation == "advection quaternion")
+                  {
+                    std::pair<std::array<double, 4>, std::array<std::array<double,2>,3>> bingham_average = compute_bingham_average(weighted_rotation_matrices, std::integral_constant<int,2> {});
+
+                    for (unsigned int i=0; i<4; ++i)
+                        data[this->data_position + mineral_i*10 + i] = bingham_average.first[i]; 
+                      
+                    for (unsigned int i = 0; i < 3; ++i)
+                      for (unsigned int j = 0; j < 2; ++j)
+                        data[this->data_position + mineral_i*10 + 4 + i*2+j] = bingham_average.second[i][j];
+                  }
+                else 
+                  {
+                    AssertThrow(output_rotation == "none", ExcMessage("not a valid output type"));
                   }
               }
           }
@@ -142,7 +169,7 @@ namespace aspect
       std::array<std::array<double,6>,3>
       CpoBinghamAverage<dim>::compute_bingham_average(std::vector<Tensor<2,3>> matrices, std::integral_constant<int,6>) const
       {
-        AssertThrow(use_rotmat == true, ExcMessage("Must use rotation matrix when array length == 6"));
+        AssertThrow(output_rotation == "full matrix", ExcMessage("Must use rotation matrix when array length == 6"));
 
         SymmetricTensor<2,3> sum_matrix_a;
         SymmetricTensor<2,3> sum_matrix_b;
@@ -214,7 +241,7 @@ namespace aspect
       std::array<std::array<double,4>,3>
       CpoBinghamAverage<dim>::compute_bingham_average(std::vector<Tensor<2,3>> matrices, std::integral_constant<int,4>) const
       {
-        AssertThrow(use_rotmat == false, ExcMessage("Must not use rotation matrix when array length == 4"));
+        AssertThrow(output_rotation == "euler angles", ExcMessage("Must not use rotation matrix when array length == 4"));
 
         SymmetricTensor<2,3> sum_matrix_a;
         SymmetricTensor<2,3> sum_matrix_b;
@@ -300,6 +327,90 @@ namespace aspect
 
       }
 
+      template <int dim>
+      std::pair<std::array<double, 4>, std::array<std::array<double,2>,3>>
+      CpoBinghamAverage<dim>::compute_bingham_average(std::vector<Tensor<2,3>> matrices, std::integral_constant<int,2>) const
+      {
+        AssertThrow(output_rotation == "advection quaternion", ExcMessage("must output pair when advection quaternion is output"));
+
+        SymmetricTensor<2,3> sum_matrix_a;
+        SymmetricTensor<2,3> sum_matrix_b;
+        SymmetricTensor<2,3> sum_matrix_c;
+
+        // extracting the a, b and c orientations from the olivine a matrix
+        // see https://courses.eas.ualberta.ca/eas421/lecturepages/orientation.html
+        const unsigned int n_matrices = matrices.size();
+        for (unsigned int i_grain = 0; i_grain < n_matrices; ++i_grain)
+          {
+            sum_matrix_a[0][0] += matrices[i_grain][0][0] * matrices[i_grain][0][0]; // SUM(l^2)
+            sum_matrix_a[1][1] += matrices[i_grain][0][1] * matrices[i_grain][0][1]; // SUM(m^2)
+            sum_matrix_a[2][2] += matrices[i_grain][0][2] * matrices[i_grain][0][2]; // SUM(n^2)
+            sum_matrix_a[0][1] += matrices[i_grain][0][0] * matrices[i_grain][0][1]; // SUM(l*m)
+            sum_matrix_a[0][2] += matrices[i_grain][0][0] * matrices[i_grain][0][2]; // SUM(l*n)
+            sum_matrix_a[1][2] += matrices[i_grain][0][1] * matrices[i_grain][0][2]; // SUM(m*n)
+
+
+            sum_matrix_b[0][0] += matrices[i_grain][1][0] * matrices[i_grain][1][0]; // SUM(l^2)
+            sum_matrix_b[1][1] += matrices[i_grain][1][1] * matrices[i_grain][1][1]; // SUM(m^2)
+            sum_matrix_b[2][2] += matrices[i_grain][1][2] * matrices[i_grain][1][2]; // SUM(n^2)
+            sum_matrix_b[0][1] += matrices[i_grain][1][0] * matrices[i_grain][1][1]; // SUM(l*m)
+            sum_matrix_b[0][2] += matrices[i_grain][1][0] * matrices[i_grain][1][2]; // SUM(l*n)
+            sum_matrix_b[1][2] += matrices[i_grain][1][1] * matrices[i_grain][1][2]; // SUM(m*n)
+
+
+            sum_matrix_c[0][0] += matrices[i_grain][2][0] * matrices[i_grain][2][0]; // SUM(l^2)
+            sum_matrix_c[1][1] += matrices[i_grain][2][1] * matrices[i_grain][2][1]; // SUM(m^2)
+            sum_matrix_c[2][2] += matrices[i_grain][2][2] * matrices[i_grain][2][2]; // SUM(n^2)
+            sum_matrix_c[0][1] += matrices[i_grain][2][0] * matrices[i_grain][2][1]; // SUM(l*m)
+            sum_matrix_c[0][2] += matrices[i_grain][2][0] * matrices[i_grain][2][2]; // SUM(l*n)
+            sum_matrix_c[1][2] += matrices[i_grain][2][1] * matrices[i_grain][2][2]; // SUM(m*n)
+
+          }
+        const std::array<std::pair<double,Tensor<1,3,double>>, 3> eigenvectors_a = eigenvectors(sum_matrix_a, SymmetricTensorEigenvectorMethod::jacobi);
+        const std::array<std::pair<double,Tensor<1,3,double>>, 3> eigenvectors_b = eigenvectors(sum_matrix_b, SymmetricTensorEigenvectorMethod::jacobi);
+        const std::array<std::pair<double,Tensor<1,3,double>>, 3> eigenvectors_c = eigenvectors(sum_matrix_c, SymmetricTensorEigenvectorMethod::jacobi);
+
+        // eigenvalues of all axes, used in the anisotropic viscosity material model to compute Hill's coefficients
+        const double eigenvalue_a1 = eigenvectors_a[0].first/matrices.size();
+        const double eigenvalue_a2 = eigenvectors_a[1].first/matrices.size();
+        const double eigenvalue_b1 = eigenvectors_b[0].first/matrices.size();
+        const double eigenvalue_b2 = eigenvectors_b[1].first/matrices.size();
+        const double eigenvalue_c1 = eigenvectors_c[0].first/matrices.size();
+        const double eigenvalue_c2 = eigenvectors_c[1].first/matrices.size();
+        
+        const std::array<std::array<double,2>,3> evs = {
+          std::array<double,2>{{eigenvalue_a1, eigenvalue_a2}},
+          std::array<double,2>{{eigenvalue_b1, eigenvalue_b2}},
+          std::array<double,2>{{eigenvalue_c1, eigenvalue_c2}}
+        };
+
+        const Tensor<1,3,double> eigvec_a = eigenvectors_a[0].second;
+        const Tensor<1,3,double> eigvec_b = eigenvectors_b[0].second;
+        const Tensor<1,3,double> eigvec_c = eigenvectors_c[0].second;
+
+        // build rotation matrix from the eigen vectors
+        Tensor<2,3> R_CPO;
+        R_CPO[0][0] = eigvec_a[0];
+        R_CPO[1][0] = eigvec_a[1];
+        R_CPO[2][0] = eigvec_a[2];
+        R_CPO[0][1] = eigvec_b[0];
+        R_CPO[1][1] = eigvec_b[1];
+        R_CPO[2][1] = eigvec_b[2];
+        R_CPO[0][2] = eigvec_c[0];
+        R_CPO[1][2] = eigvec_c[1];
+        R_CPO[2][2] = eigvec_c[2];
+
+        // convert rotation matrix to euler angles phi1, theta, phi2
+        Tensor<2,3> Rot = transpose(R_CPO);
+        Rot = dealii::project_onto_orthogonal_tensors(Rot);
+        
+        std::array<double,4> adv_quat = aspect::Utilities::Quaternions::rotation_matrix_to_advection_quaternion(Rot, 1e-12);
+        // only store evs 1 and 2 as sum_i \lambda_i = 1 by construction
+        return std::make_pair(adv_quat, evs);
+
+      }
+
+      
 
 
       template <int dim>
@@ -326,7 +437,7 @@ namespace aspect
       {
         std::vector<std::pair<std::string,unsigned int>> property_information;
         property_information.reserve(6*n_minerals);
-        if (use_rotmat == true)
+        if (output_rotation == "full matrix")
           {
             for (unsigned int mineral_i = 0; mineral_i < n_minerals; ++mineral_i)
               {
@@ -338,7 +449,7 @@ namespace aspect
                 property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " eigenvalues c axis",3);
               }
           }
-        else
+        else if (output_rotation == "euler angles")
           {
             for (unsigned int mineral_i = 0; mineral_i < n_minerals; ++mineral_i)
               {
@@ -350,7 +461,26 @@ namespace aspect
                 property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " eigenvalues c axis",3);
               }
           }
+        else if (output_rotation == "advection quaternion")
+          {
+            for (unsigned int mineral_i = 0; mineral_i < n_minerals; ++mineral_i)
+              {
+                property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " q.w",1);
+                property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " q.x",1);
+                property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " q.y",1);
+                property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " q.z",1);
 
+                property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " eigenvalues a axis",2);
+                property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " eigenvalues b axis",2);
+                property_information.emplace_back("cpo mineral " + std::to_string(mineral_i) + " eigenvalues c axis",2);
+              }
+            
+          }
+        else 
+          {
+            AssertThrow(output_rotation == "none", ExcMessage("not a valid output type"));
+          }
+        
         return property_information;
       }
 
@@ -368,17 +498,15 @@ namespace aspect
                              "results are reproducible as long as the problem is run with the "
                              "same amount of MPI processes. It is implemented as final seed = "
                              "Random number seed + MPI Rank. ");
-
           prm.declare_entry ("Number of samples", "0",
                              Patterns::Double(0),
                              "This determines how many samples are taken when using the random "
                              "draw volume averaging. Setting it to zero means that the number of "
                              "samples is set to be equal to the number of grains.");
-          prm.declare_entry ("Use rotation matrix","true",
-                             Patterns::Bool(),
-                             "This determines whether the orientations will be saved as rotation "
-                             "matrices or Euler angles. Setting it to fause means that the "
-                             "orientations will be saved as Euler angles.");
+          prm.declare_entry ("output rotation as","full matrix",
+                             Patterns::Selection("full matrix|euler angles|advection quaternion"),
+                             "possible options are full matrix, euler angles and advection quaternion"
+                             "This determines whether the orientations will be saved as eigenvectors i.e. full rotation, Euler angles in the zxz convention (not equivalent to the Bunge convention) or as a unit quaternion multiplied by its scalar component coined advection_quaternion.");
         }
         prm.leave_subsection ();
       }
@@ -399,7 +527,7 @@ namespace aspect
           n_grains = cpo_particle_property->get_number_of_grains();
           n_minerals = cpo_particle_property->get_number_of_minerals();
           n_samples = prm.get_integer("Number of samples");
-          use_rotmat = prm.get_bool ("Use rotation matrix");
+          output_rotation = prm.get("output rotation as");
           if (n_samples == 0)
             n_samples = n_grains;
         }
