@@ -1617,12 +1617,8 @@ namespace aspect
     for_constraints.subtract_set(nonzero_pc_dofs);
 
     // and constrain the remaining dofs (that are not in melt cells).
-#if DEAL_II_VERSION_GTE(9,6,0)
     for (const auto index : for_constraints)
       constraints.constrain_dof_to_zero(index);
-#else
-    constraints.add_lines(for_constraints);
-#endif
   }
 
 
@@ -1665,10 +1661,10 @@ namespace aspect
   edit_finite_element_variables(const Parameters<dim> &parameters,
                                 std::vector<VariableDeclaration<dim>> &variables)
   {
+    // We should only get here if melt transport is included:
+    Assert (parameters.include_melt_transport, ExcInternalError());
 
-    if (!parameters.include_melt_transport)
-      return;
-
+    // We modify the existing FE variables: u p T c1 c2 to read: u p_f p_c u_f p T c1 c2
     variables.insert(variables.begin()+1,
                      VariableDeclaration<dim>(
                        "fluid pressure",
@@ -1694,7 +1690,6 @@ namespace aspect
                                               std::make_shared<FE_Q<dim>>(parameters.stokes_velocity_degree),
                                               dim,
                                               1));
-
   }
 
 

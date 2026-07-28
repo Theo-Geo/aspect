@@ -655,12 +655,8 @@ namespace aspect
 
       // Now construct the mesh displacement constraints
       mesh_velocity_constraints.clear();
-#if DEAL_II_VERSION_GTE(9,6,0)
       mesh_velocity_constraints.reinit(mesh_deformation_dof_handler.locally_owned_dofs(),
                                        mesh_locally_relevant);
-#else
-      mesh_velocity_constraints.reinit(mesh_locally_relevant);
-#endif
       // mesh_velocity_constraints can use the same hanging node
       // information that was used for mesh_vertex constraints.
       mesh_velocity_constraints.merge(mesh_vertex_constraints);
@@ -1277,7 +1273,7 @@ namespace aspect
                                         level);
         }
 
-      MGTransferMF<dim, double> mg_transfer(mg_constrained_dofs);
+      MGTransferType<dim, double> mg_transfer(mg_constrained_dofs);
       mg_transfer.build(mesh_deformation_dof_handler);
 
       using SmootherType =
@@ -1333,7 +1329,7 @@ namespace aspect
       mg.set_edge_matrices(mg_interface, mg_interface);
       PreconditionMG<dim,
                      dealii::LinearAlgebra::distributed::Vector<double>,
-                     MGTransferMF<dim, double>>
+                     MGTransferType<dim, double>>
                      preconditioner(mesh_deformation_dof_handler, mg, mg_transfer);
 
 
