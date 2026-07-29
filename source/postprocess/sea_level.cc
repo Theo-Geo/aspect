@@ -46,11 +46,21 @@ namespace aspect
   namespace Postprocess
   {
     template <int dim>
+    SeaLevel<dim>::SeaLevel()
+      : last_output_time(std::numeric_limits<double>::lowest())
+    {
+    }
+
+
+
+    template <int dim>
     void
     SeaLevel<dim>::initialize()
     {
       Assert(false, ExcNotImplemented(""));
     }
+
+
 
     template <>
     void
@@ -356,7 +366,7 @@ namespace aspect
       // If this is the first time we get here, set the last output time
       // to the current time - output_interval. This makes sure we
       // always produce data during the first time step.
-      if (std::isnan(last_output_time))
+      if (last_output_time < this->get_parameters().start_time - output_interval)
         {
           last_output_time = this->get_time() - output_interval;
         }
@@ -590,10 +600,10 @@ namespace aspect
   {
     ASPECT_REGISTER_POSTPROCESSOR(SeaLevel,
                                   "sea level",
-                                  "A postprocessor that computes the sea level for glacial isostatic adjustment"
-                                  "modeling. When ice melts and enters the ocean, the ocean water needs to be"
-                                  "redistributed in a gravitationally consistent way. With the updated surface"
-                                  "loading (ocean and ice) the free surface deformation needs to be computed"
+                                  "A postprocessor that computes the sea level for glacial isostatic adjustment "
+                                  "modeling. When ice melts and enters the ocean, the ocean water needs to be "
+                                  "redistributed in a gravitationally consistent way. With the updated surface "
+                                  "loading (ocean and ice) the free surface deformation needs to be computed "
                                   "iteratively before moving to the next time step. "
                                   "A postprocessor intended for use with a deforming top surface. After every step "
                                   "it computes the sea level based on the topography, ocean basin, ice melt, "

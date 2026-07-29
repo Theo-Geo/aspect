@@ -548,6 +548,29 @@ namespace aspect
         (timestep_number % parameters.checkpoint_steps == 0))
       write_checkpoint = true;
 
+    /*
+     * See if an additional checkpoint needs to be created. Time has already been advanced
+     * to the next timestep.
+     * TODO if through the other criteria we already determined that a checkpoint needs to be created,
+     * we could copy the checkpoint.
+     */
+    bool created_additional_checkpoint = false;
+    // Loop over as many times as this is necessary
+    while ((parameters.additional_checkpoint_times.size() > 0)
+           &&
+           (parameters.additional_checkpoint_times.front () < time))
+      {
+        // Avoid checkpointing the same time step multiple times
+        // if the time step size encompasses multiple additional checkpoint times.
+        if (created_additional_checkpoint == false)
+          {
+            create_snapshot(true);
+            created_additional_checkpoint = true;
+          }
+        parameters.additional_checkpoint_times
+        .erase (parameters.additional_checkpoint_times.begin());
+      }
+
     // Do a checkpoint if indicated by checkpoint parameters
     if (write_checkpoint)
       {
@@ -2246,7 +2269,7 @@ namespace aspect
     MaterialModel::MaterialModelInputs<dim> in(fe_face_values.n_quadrature_points, introspection.n_compositional_fields);
     MaterialModel::MaterialModelOutputs<dim> out(fe_face_values.n_quadrature_points, introspection.n_compositional_fields);
     MeltHandler<dim>::create_material_model_outputs(out);
-    std::shared_ptr<MaterialModel::MeltOutputs<dim>> fluid_out
+    std::shared_ptr<const MaterialModel::MeltOutputs<dim>> fluid_out
       = out.template get_additional_output_object<MaterialModel::MeltOutputs<dim>>();
 
     const auto &tangential_velocity_boundaries =

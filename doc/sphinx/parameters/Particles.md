@@ -95,7 +95,7 @@ Select one of the following models:
 
 The following properties are available:
 
-&lsquo;composition&rsquo;: Implementation of a plugin in which the particle property is defined by the compositional fields in the model. This can be used to track solid compositionevolution over time.
+&lsquo;composition&rsquo;: Implementation of a plugin in which the particle property is defined by the compositional fields in the model. This can be used to track solid composition evolution over time.
 
 &lsquo;composition reaction&rsquo;: Implementation of a plugin in which the particle property is given as the initial composition at the particle&rsquo;s initial position, and is updated during the simulation time according to reactions that are specified as functions in the input file. Each reaction has exactly one reactant and one product. Each particle gets as many properties as there are compositional fields. The reactions are described by two functions, and the change in each composition at the time a reaction occurs is computed as the product of the two functions. The &rsquo;Reaction area function&rsquo; describes the area where the reaction takes place. It can be spatially variable, but does not depend on time. The &rsquo;Reaction rate function&rsquo; describes how the change in composition depends on these compositions themselves and on time. To use this particle property for a given compositional field, set the &rsquo;Mapped particle properties&rsquo; to &rsquo;name_of_field:name_of_field reaction&rsquo;, i.e., the name of the particle property for each field is the name of the compositional field with the word &rsquo;reaction&rsquo; added at the end.
 
@@ -133,7 +133,7 @@ The following properties are available:
 
 &lsquo;strain rate&rsquo;: Implementation of a plugin in which the time evolution of strain rate is saved and stored on the particles.
 
-&lsquo;velocity&rsquo;: Implementation of a plugin in which the particle property is defined as the recent velocity at this position.
+&lsquo;velocity&rsquo;: Implementation of a plugin in which the particle property is defined as the recent velocity at this position. The velocity depends on whether the particle world is being advected with a solid or fluid velocity.
 
 &lsquo;velocity gradient&rsquo;: Implementation of a plugin in which the particle property is defined as the recent velocity gradient at this position.
 
@@ -183,6 +183,15 @@ The following properties are available:
 **Pattern:** [Selection random|histogram|point density function ]
 
 **Documentation:** Algorithm used to add particles to cells.
+::::
+
+::::{dropdown} __Parameter:__ {ref}`Particle advection velocity<parameters:Particles/Particle_20advection_20velocity>`
+:name: parameters:Particles/Particle_20advection_20velocity
+**Default value:** automatic
+
+**Pattern:** [Selection automatic|fluid|solid ]
+
+**Documentation:** This parameter determines which velocity will be used to advect a particular particle world. This can be the solid velocity (if option &rsquo;solid&rsquo; is chosen), or the fluid velocity obtained by solving the coupled Stokes/Darcy equations in simulations with melt transport (if &rsquo;fluid&rsquo; is chosen). If &rsquo;automatic&rsquo; is chosen, particles are advected with the melt velocity in case both melt transport is turned on and the particle property &rsquo;melt particle&rsquo; is used in the simulation.)
 ::::
 
 ::::{dropdown} __Parameter:__ {ref}`Particle generator name<parameters:Particles/Particle_20generator_20name>`

@@ -329,7 +329,7 @@ namespace aspect
                       unsigned int c_is_nth_entropy_field = 0;
 
                       unsigned int nth_entropy_index = 0;
-                      for (unsigned int entropy_index : entropy_indices)
+                      for (const unsigned int entropy_index : entropy_indices)
                         {
                           if (c == entropy_index)
                             {
@@ -507,7 +507,7 @@ namespace aspect
                              "Units: \\si{\\degree}.");
           prm.declare_entry ("Cohesion", "1e20",
                              Patterns::Double (0.),
-                             "The value of the cohesion, $C$. The extremely large default"
+                             "The value of the cohesion, $C$. The extremely large default "
                              "cohesion value (1e20 Pa) prevents the viscous stress from "
                              "exceeding the yield stress. Units: \\si{\\pascal}.");
 

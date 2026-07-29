@@ -995,6 +995,21 @@ namespace aspect
                          "If 0 and time between checkpoint is not specified, "
                          "checkpointing will not be performed. "
                          "Units: None.");
+      prm.declare_entry ("Additional checkpoint times", "",
+                         Patterns::List (Patterns::Double (0.)),
+                         "A list of times so that if the end time of a time step "
+                         "is beyond this time, an additional checkpoint "
+                         "is created. These checkpoint times are independent of the "
+                         "checkpoint frequency specified by ``Time between checkpoint'' "
+                         "and ``Steps between checkpoint'', therefore additional checkpoints "
+                         "can also be created if these parameters are both set to zero. "
+                         "The additional checkpoints are numbered consequetively starting from "
+                         "``Number of checkpoints to keep'' + 1. If a time step is so large "
+                         "that it crosses multiple additional checkpoint times, only one "
+                         "checkpoint is created, and the rest of that time step's checkpoints "
+                         "are not taken into account in the checkpoint numbering. "
+                         "Units: \\si{\\year} if the 'Use years instead "
+                         "of seconds' parameter is set; \\si{\\second} otherwise.");
       prm.declare_entry ("Number of checkpoints to keep", "3",
                          Patterns::Integer (1),
                          "The number of checkpoint slots to rotate through in the "
@@ -1100,7 +1115,7 @@ namespace aspect
                          "and $Q_{k-1}$ for the pressure. This is because using the "
                          "\\textit{same} polynomial degree for both the velocity and the "
                          "pressure turns out to violate some mathematical properties "
-                         "necessary to make the problem solvable. (In particular, the"
+                         "necessary to make the problem solvable. (In particular, the "
                          "condition in question goes by the name ``inf-sup'' or "
                          "Babu{\\v s}ka-Brezzi or LBB condition.) A consequence of "
                          "violating this condition is that the pressure may show "
@@ -1937,6 +1952,17 @@ namespace aspect
     {
       checkpoint_time_secs = prm.get_integer ("Time between checkpoint");
       checkpoint_steps     = prm.get_integer ("Steps between checkpoint");
+      // Extract the list of times at which additional checkpointing is requested,
+      // sort them and convert them to seconds if needed.
+      additional_checkpoint_times
+        = Utilities::string_to_double
+          (Utilities::split_string_list(prm.get ("Additional checkpoint times")));
+      std::sort (additional_checkpoint_times.begin(),
+                 additional_checkpoint_times.end());
+      if (convert_to_years == true)
+        for (double &additional_checkpoint_time : additional_checkpoint_times)
+          additional_checkpoint_time *= year_in_seconds;
+      n_additional_checkpoints_to_keep = additional_checkpoint_times.size();
       n_checkpoints_to_keep = prm.get_integer ("Number of checkpoints to keep");
       resume_checkpoint_id  = prm.get_integer ("Resume checkpoint");
       resume_time           = prm.get_double ("Resume time");
@@ -2146,7 +2172,7 @@ namespace aspect
       AssertThrow (normalized_fields.size() <= n_compositional_fields,
                    ExcMessage("Invalid input parameter file: Too many entries in List of normalized fields"));
 
-      for (unsigned int field : normalized_fields)
+      for (const unsigned int field : normalized_fields)
         {
           AssertThrow(field<n_compositional_fields,
                       ExcMessage("Invalid input parameter file: An entry in List of normalized fields is larger then the number of fields."));

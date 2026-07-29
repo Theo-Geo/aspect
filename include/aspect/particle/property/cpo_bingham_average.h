@@ -162,6 +162,12 @@ namespace aspect
           void
           parse_parameters (ParameterHandler &prm) override;
 
+          void
+          save (std::map<std::string, std::string> &status_strings) const override;
+
+          void
+          load (const std::map<std::string, std::string> &status_strings) override;
+
         private:
           /**
            * stores the position of the cpo data in the particle property vector
@@ -181,7 +187,10 @@ namespace aspect
           mutable std::mt19937 random_number_generator;
 
           /**
-           * the random number generator seed used to initialize the random number generator.
+           * The random number generator seed used to initialize the random number generator.
+           *
+           * This variable is read from the parameter file through a parameter
+           * called 'Random number seed'.
            */
           unsigned int random_number_seed;
 
@@ -197,11 +206,16 @@ namespace aspect
 
           /**
            * when doing the random draw volume weighting, this sets how many samples are taken.
+           * This variable is read from the parameter file through a parameter
+           * called 'Number of samples'.
            */
           unsigned int n_samples;
 
-          /*
-           this sets whether the orientations are represented by rotation matrix, Euler angles or a quaternion.
+          /**
+           * This variable determines whether the orientations are represented by a rotation matrix, Euler angles or a quaternion
+           *
+           * This variable is read from the parameter file through a parameter
+           * called 'Use rotation matrix'.
            */
           std::string output_rotation;
 

@@ -302,6 +302,24 @@ namespace aspect
                             const bool compute_strain_rate = true);
 
         /**
+         * Resize the internal data structures to provide sufficient memory
+         * to store (at least) @p n_points points and @p n_comp compositions.
+         * If possible reallocation of memory will be avoided.
+         * All entries will be reset to signaling NaNs.
+         * This function is not supported if AdditionalMaterialInputs are
+         * attached.
+         *
+         * @param n_points The number of quadrature points for which input
+         * quantities will be provided.
+         * @param n_comp The number of vector quantities (in the order in which
+         * the Introspection class reports them) for which input will be
+         * provided.
+         */
+        void
+        resize(const unsigned int n_points,
+               const unsigned int n_comp);
+
+        /**
          * Copy constructor. This constructor copies all data members of the
          * source object except for the additional input data (of type
          * AdditionalMaterialInputs) pointers, stored in the
@@ -516,14 +534,32 @@ namespace aspect
          * Constructor. Initialize the various arrays of this structure with the
          * given number of quadrature points and (finite element) components.
          *
-         * @param n_points The number of quadrature points for which input
+         * @param n_points The number of quadrature points for which output
          * quantities will be provided.
          * @param n_comp The number of vector quantities (in the order in which
-         * the Introspection class reports them) for which input will be
+         * the Introspection class reports them) for which output will be
          * provided.
          */
         MaterialModelOutputs (const unsigned int n_points,
                               const unsigned int n_comp);
+
+        /**
+         * Resize the internal data structures to provide sufficient memory
+         * to store (at least) @p n_points points and @p n_comp compositions.
+         * If possible reallocation of memory will be avoided.
+         * All entries will be reset to signaling NaNs.
+         * This function is not supported if AdditionalMaterialOutputs are
+         * attached.
+         *
+         * @param n_points The number of quadrature points for which output
+         * quantities will be computed.
+         * @param n_comp The number of vector quantities (in the order in which
+         * the Introspection class reports them) for which output will be
+         * computed.
+         */
+        void
+        resize(const unsigned int n_points,
+               const unsigned int n_comp);
 
         /**
          * Copy constructor. This constructor copies all data members of the

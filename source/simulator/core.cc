@@ -211,6 +211,8 @@ namespace aspect
                      TimerOutput::wall_times),
     total_walltime_until_last_snapshot(0.),
     last_checkpoint_id (numbers::invalid_unsigned_int),
+    last_regular_checkpoint_id (numbers::invalid_unsigned_int),
+    last_additional_checkpoint_id (parameters.n_checkpoints_to_keep),
     initial_topography_model(InitialTopographyModel::create_initial_topography_model<dim>(prm)),
     geometry_model (GeometryModel::create_geometry_model<dim>(prm)),
     // make sure the parameters object gets a chance to
@@ -484,20 +486,25 @@ namespace aspect
 
     if (particles_are_needed)
       {
-        particle_managers.resize(parameters.n_particle_managers);
-
-        AssertThrow(particle_managers.size() <= ASPECT_MAX_NUM_PARTICLE_SYSTEMS,
-                    ExcMessage("You have selected " + std::to_string(particle_managers.size()) + " particle managers, but ASPECT "
+        AssertThrow(parameters.n_particle_managers <= ASPECT_MAX_NUM_PARTICLE_SYSTEMS,
+                    ExcMessage("You have selected " + std::to_string(parameters.n_particle_managers) + " particle managers, but ASPECT "
                                "has been compiled with a maximum of " + std::to_string(ASPECT_MAX_NUM_PARTICLE_SYSTEMS) + ". "
                                "Please recompile ASPECT with a higher value for ASPECT_MAX_NUM_PARTICLE_SYSTEMS. You can set a higher number "
                                "specifying the CMake variable -DASPECT_MAX_NUM_PARTICLE_SYSTEMS=<number>"));
 
-        for (unsigned int particle_manager_index = 0 ; particle_manager_index < particle_managers.size(); ++particle_manager_index)
+        // Create the particle managers:
+        for (unsigned int particle_manager_index = 0; particle_manager_index < parameters.n_particle_managers; ++particle_manager_index)
+          {
+            particle_managers.emplace_back(Particle::Manager<dim>(particle_manager_index));
+          }
+
+        // And then initialize them:
+        for (unsigned int particle_manager_index = 0; particle_manager_index < particle_managers.size(); ++particle_manager_index)
           {
             if (SimulatorAccess<dim> *sim = dynamic_cast<SimulatorAccess<dim>*>(&particle_managers[particle_manager_index]))
               sim->initialize_simulator (*this);
 
-            particle_managers[particle_manager_index].parse_parameters(prm,particle_manager_index);
+            particle_managers[particle_manager_index].parse_parameters(prm);
             particle_managers[particle_manager_index].initialize();
           }
       }
@@ -1597,6 +1604,10 @@ namespace aspect
   void
   Simulator<dim>::setup_introspection ()
   {
+    introspection.initialize_stokes_dof_info(finite_element);
+    if (parameters.include_melt_transport)
+      melt_handler->initialize_stokes_dof_info(introspection, finite_element);
+
     // compute the various partitionings between processors and blocks
     // of vectors and matrices
     introspection.system_dofs_per_block = DoFTools::count_dofs_per_fe_block (dof_handler,
@@ -2156,11 +2167,21 @@ namespace aspect
             parameters.additional_refinement_times
             .erase (parameters.additional_refinement_times.begin());
           }
+
+        // we need to remove additional_checkpoint_times that are in the past
+        while ((parameters.additional_checkpoint_times.size() > 0)
+               &&
+               (parameters.additional_checkpoint_times.front () < time+time_step))
+          {
+            parameters.additional_checkpoint_times
+            .erase (parameters.additional_checkpoint_times.begin());
+          }
       }
     else
       {
         // This will cause the next checkpoint to be written to be 01:
         last_checkpoint_id = 0;
+        last_regular_checkpoint_id = 0;
 
         time = parameters.start_time;
 
