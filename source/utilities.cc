@@ -3135,6 +3135,8 @@ namespace aspect
         return symmetrize((rotation_matrix*input_tensor)*rotation_matrix_transposed);
       }
 
+
+
       SymmetricTensor<2,6>
       rotate_kelvin_tensor(const Tensor<2,3> &rotation_tensor, const SymmetricTensor<2,6> &input_tensor)
       {
@@ -3189,6 +3191,7 @@ namespace aspect
 
         return symmetrize((rotation_matrix*input_tensor)*transpose(rotation_matrix));
       }
+
 
 
       SymmetricTensor<2,6>
@@ -3418,9 +3421,11 @@ namespace aspect
     }
 
 
+
     namespace Quaternions
     {
-      std::array<double,4> rotation_matrix_to_quaternion(const Tensor<2,3> &rotation_matrix, const long double tolerance)
+      std::array<double,4>
+      rotation_matrix_to_quaternion(const Tensor<2,3> &rotation_matrix, const long double tolerance)
       {
         std::array<double,4> quaternion;
         const double w = 0.5*std::sqrt(std::abs(rotation_matrix[0][0] + rotation_matrix[1][1] + rotation_matrix[2][2] + 1));
@@ -3443,9 +3448,16 @@ namespace aspect
         return quaternion;
       }
 
+
+
       Tensor<2,3>
-      quaternion_to_rotation_matrix(const double w,const double x, const double y, const double z)
+      quaternion_to_rotation_matrix(const std::array<double,4> &quaternion)
       {
+        const double w = quaternion[0];
+        const double x = quaternion[1];
+        const double y = quaternion[2];
+        const double z = quaternion[3];
+
         Tensor<2,3> rotation_matrix;
         rotation_matrix[0][0] = Utilities::fixed_power<2>(x)- Utilities::fixed_power<2>(y) - Utilities::fixed_power<2>(z) + Utilities::fixed_power<2>(w);
         rotation_matrix[1][1] = Utilities::fixed_power<2>(y)- Utilities::fixed_power<2>(z) - Utilities::fixed_power<2>(x) + Utilities::fixed_power<2>(w);
@@ -3578,14 +3590,14 @@ namespace aspect
     \
     template \
     double consistent_second_invariant_of_deviatoric_tensor(const SymmetricTensor<2,dim> &); \
+  } \
+  \
+  namespace Quaternions \
+  { \
+    std::array<double,4> rotation_matrix_to_quaternion(const Tensor<2,3> &rotation_matrix, const long double tolerance); \
+    \
+    Tensor<2,3> quaternion_to_rotation_matrix(const std::array<double,4> &quaternion); \
   }
-
-    namespace Quaternions
-    {
-      std::array<double,4> rotation_matrix_to_quaternion(const Tensor<2,3> &rotation_matrix, const long double tolerance);
-
-      Tensor<2,3> quaternion_to_rotation_matrix(const double w, const double x, const double y, const double z);
-    }
 
 
     ASPECT_INSTANTIATE(INSTANTIATE)
