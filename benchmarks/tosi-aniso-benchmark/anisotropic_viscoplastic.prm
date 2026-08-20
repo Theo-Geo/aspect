@@ -230,6 +230,6 @@ subsection Particles
   subsection CPO Bingham Average
     set Random number seed = 200
     # Necessary such that Euler angles are created as an output instead of the rotation matrix.  
-    set Use rotation matrix = false 
+    set output rotation as = euler angles
   end
 end

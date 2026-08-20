@@ -213,6 +213,7 @@ namespace aspect
                                      + 3/Hi[i+3]*Utilities::fixed_power<2>(strain_rate_cpo_frame[ji[i]][ki[i]])
                                    );
         }
+      AssertThrow(anisotropic_invariant > 0, ExcMessage(std::to_string(F) + "  " + std::to_string(G) + "  " + std::to_string(H) + "  " + std::to_string(L) + "  "+ std::to_string(M) + "  "+ std::to_string(N) + "  "+ std::to_string(anisotropic_invariant) + " anisotropic invariant is not positive"));
 
       return std::sqrt(anisotropic_invariant);
     }
@@ -299,34 +300,53 @@ namespace aspect
               const std::vector<double> &composition = in.composition[q];
               const double eigvalue_a1 = composition[cpo_bingham_eigenvalues_indices[0][0]];
               const double eigvalue_a2 = composition[cpo_bingham_eigenvalues_indices[0][1]];
-              const double eigvalue_a3 = 1 - eigvalue_a1 - eigvalue_a2;
+              const double eigvalue_a3 = std::max(1 - eigvalue_a1 - eigvalue_a2, 1e-2);
+              AssertThrow(eigvalue_a3>0, ExcMessage("eigenvalue a3, " + std::to_string(eigvalue_a3) + " is not allowed to be below zero"));
+              AssertThrow(eigvalue_a2>0, ExcMessage("eigenvalue a2, " + std::to_string(eigvalue_a2) + " is not allowed to be below zero"));
+              AssertThrow(eigvalue_a1>0, ExcMessage("eigenvalue a1, " + std::to_string(eigvalue_a1) + " is not allowed to be below zero"));
 
               const double eigvalue_b1 = composition[cpo_bingham_eigenvalues_indices[1][0]];
               const double eigvalue_b2 = composition[cpo_bingham_eigenvalues_indices[1][1]];
-              const double eigvalue_b3 = 1 - eigvalue_b1 - eigvalue_b2;
-              
+              const double eigvalue_b3 = std::max(1 - eigvalue_b1 - eigvalue_b2, 1e-2);
+              AssertThrow(eigvalue_b3>0, ExcMessage("eigenvalue b3, " + std::to_string(eigvalue_b3) + " is not allowed to be below zero"));
+              AssertThrow(eigvalue_b2>0, ExcMessage("eigenvalue b2, " + std::to_string(eigvalue_b2) + " is not allowed to be below zero"));
+              AssertThrow(eigvalue_b1>0, ExcMessage("eigenvalue b1, " + std::to_string(eigvalue_b1) + " is not allowed to be below zero"));
+
               const double eigvalue_c1 = composition[cpo_bingham_eigenvalues_indices[2][0]];
               const double eigvalue_c2 = composition[cpo_bingham_eigenvalues_indices[2][1]];
-              const double eigvalue_c3 = 1 - eigvalue_c1 - eigvalue_c2;
+              const double eigvalue_c3 = std::max(1 - eigvalue_c1 - eigvalue_c2, 1e-2);
+
+              AssertThrow(eigvalue_c3>0, ExcMessage("eigenvalue c3, " + std::to_string(eigvalue_c3) + " is not allowed to be below zero"));
+              AssertThrow(eigvalue_c2>0, ExcMessage("eigenvalue c2, " + std::to_string(eigvalue_c2) + " is not allowed to be below zero"));
+              AssertThrow(eigvalue_c1>0, ExcMessage("eigenvalue c1, " + std::to_string(eigvalue_c1) + " is not allowed to be below zero"));
 
               std::array<double,4> cpo_quaternion;
               for (unsigned int j=0; j<4;j++)
                   cpo_quaternion[j] = composition[cpo_quaternion_indices[j]];
 
               // const Tensor<2,3> R = Utilities::zxz_euler_angles_to_rotation_matrix(phi1*constants::radians_to_degree, theta*constants::radians_to_degree, phi2*constants::radians_to_degree);
-              const Tensor<2,3> R = Utilities::Quaternions::quaternion_to_rotation_matrix(cpo_quaternion);
+              // we need a passive rotation
+              const Tensor<2,3> R = transpose(Utilities::Quaternions::quaternion_to_rotation_matrix(cpo_quaternion));
 
               // initialize scalar viscosity
               double scalar_viscosity = composition[viscosity_field_index];
 
               // Compute Hill Parameters FGHLMN from the eigenvalues of a,b,c axis
               // CPO2Hill v3 model:
-              const double F = Utilities::fixed_power<2>(eigvalue_a1)*CnI_F[0] + eigvalue_a1*CnI_F[1] + eigvalue_a2*CnI_F[2] + (1/eigvalue_a3)*CnI_F[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_F[4] + eigvalue_b1*CnI_F[5] + eigvalue_b2*CnI_F[6] + (1/eigvalue_b3)*CnI_F[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_F[8] + eigvalue_c1*CnI_F[9] + eigvalue_c2*CnI_F[10] + (1/eigvalue_c3)*CnI_F[11] + CnI_F[12];
-              const double G = Utilities::fixed_power<2>(eigvalue_a1)*CnI_G[0] + eigvalue_a1*CnI_G[1] + eigvalue_a2*CnI_G[2] + (1/eigvalue_a3)*CnI_G[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_G[4] + eigvalue_b1*CnI_G[5] + eigvalue_b2*CnI_G[6] + (1/eigvalue_b3)*CnI_G[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_G[8] + eigvalue_c1*CnI_G[9] + eigvalue_c2*CnI_G[10] + (1/eigvalue_c3)*CnI_G[11] + CnI_G[12];
-              const double H = Utilities::fixed_power<2>(eigvalue_a1)*CnI_H[0] + eigvalue_a1*CnI_H[1] + eigvalue_a2*CnI_H[2] + (1/eigvalue_a3)*CnI_H[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_H[4] + eigvalue_b1*CnI_H[5] + eigvalue_b2*CnI_H[6] + (1/eigvalue_b3)*CnI_H[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_H[8] + eigvalue_c1*CnI_H[9] + eigvalue_c2*CnI_H[10] + (1/eigvalue_c3)*CnI_H[11] + CnI_H[12];
-              const double L = std::abs(Utilities::fixed_power<2>(eigvalue_a1)*CnI_L[0] + eigvalue_a1*CnI_L[1] + eigvalue_a2*CnI_L[2] + (1/eigvalue_a3)*CnI_L[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_L[4] + eigvalue_b1*CnI_L[5] + eigvalue_b2*CnI_L[6] + (1/eigvalue_b3)*CnI_L[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_L[8] + eigvalue_c1*CnI_L[9] + eigvalue_c2*CnI_L[10] + (1/eigvalue_c3)*CnI_L[11] + CnI_L[12]);
-              const double M = std::abs(Utilities::fixed_power<2>(eigvalue_a1)*CnI_M[0] + eigvalue_a1*CnI_M[1] + eigvalue_a2*CnI_M[2] + (1/eigvalue_a3)*CnI_M[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_M[4] + eigvalue_b1*CnI_M[5] + eigvalue_b2*CnI_M[6] + (1/eigvalue_b3)*CnI_M[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_M[8] + eigvalue_c1*CnI_M[9] + eigvalue_c2*CnI_M[10] + (1/eigvalue_c3)*CnI_M[11] + CnI_M[12]);
-              const double N = std::abs(Utilities::fixed_power<2>(eigvalue_a1)*CnI_N[0] + eigvalue_a1*CnI_N[1] + eigvalue_a2*CnI_N[2] + (1/eigvalue_a3)*CnI_N[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_N[4] + eigvalue_b1*CnI_N[5] + eigvalue_b2*CnI_N[6] + (1/eigvalue_b3)*CnI_N[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_N[8] + eigvalue_c1*CnI_N[9] + eigvalue_c2*CnI_N[10] + (1/eigvalue_c3)*CnI_N[11] + CnI_N[12]);
+              const double F = std::min(1., std::max(0., Utilities::fixed_power<2>(eigvalue_a1)*CnI_F[0] + eigvalue_a1*CnI_F[1] + eigvalue_a2*CnI_F[2] + (1/eigvalue_a3)*CnI_F[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_F[4] + eigvalue_b1*CnI_F[5] + eigvalue_b2*CnI_F[6] + (1/eigvalue_b3)*CnI_F[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_F[8] + eigvalue_c1*CnI_F[9] + eigvalue_c2*CnI_F[10] + (1/eigvalue_c3)*CnI_F[11] + CnI_F[12]));
+              const double G = std::min(1., std::max(0.,Utilities::fixed_power<2>(eigvalue_a1)*CnI_G[0] + eigvalue_a1*CnI_G[1] + eigvalue_a2*CnI_G[2] + (1/eigvalue_a3)*CnI_G[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_G[4] + eigvalue_b1*CnI_G[5] + eigvalue_b2*CnI_G[6] + (1/eigvalue_b3)*CnI_G[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_G[8] + eigvalue_c1*CnI_G[9] + eigvalue_c2*CnI_G[10] + (1/eigvalue_c3)*CnI_G[11] + CnI_G[12]));
+              const double H = std::min(1.,std::max(0., Utilities::fixed_power<2>(eigvalue_a1)*CnI_H[0] + eigvalue_a1*CnI_H[1] + eigvalue_a2*CnI_H[2] + (1/eigvalue_a3)*CnI_H[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_H[4] + eigvalue_b1*CnI_H[5] + eigvalue_b2*CnI_H[6] + (1/eigvalue_b3)*CnI_H[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_H[8] + eigvalue_c1*CnI_H[9] + eigvalue_c2*CnI_H[10] + (1/eigvalue_c3)*CnI_H[11] + CnI_H[12]));
+              const double L = std::min(5., std::max(0.5, Utilities::fixed_power<2>(eigvalue_a1)*CnI_L[0] + eigvalue_a1*CnI_L[1] + eigvalue_a2*CnI_L[2] + (1/eigvalue_a3)*CnI_L[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_L[4] + eigvalue_b1*CnI_L[5] + eigvalue_b2*CnI_L[6] + (1/eigvalue_b3)*CnI_L[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_L[8] + eigvalue_c1*CnI_L[9] + eigvalue_c2*CnI_L[10] + (1/eigvalue_c3)*CnI_L[11] + CnI_L[12]));
+              const double M = std::min(20., std::max(0.5, Utilities::fixed_power<2>(eigvalue_a1)*CnI_M[0] + eigvalue_a1*CnI_M[1] + eigvalue_a2*CnI_M[2] + (1/eigvalue_a3)*CnI_M[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_M[4] + eigvalue_b1*CnI_M[5] + eigvalue_b2*CnI_M[6] + (1/eigvalue_b3)*CnI_M[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_M[8] + eigvalue_c1*CnI_M[9] + eigvalue_c2*CnI_M[10] + (1/eigvalue_c3)*CnI_M[11] + CnI_M[12]));
+              const double N = std::min(20., std::max(0.5, Utilities::fixed_power<2>(eigvalue_a1)*CnI_N[0] + eigvalue_a1*CnI_N[1] + eigvalue_a2*CnI_N[2] + (1/eigvalue_a3)*CnI_N[3] + Utilities::fixed_power<2>(eigvalue_b1)*CnI_N[4] + eigvalue_b1*CnI_N[5] + eigvalue_b2*CnI_N[6] + (1/eigvalue_b3)*CnI_N[7] + Utilities::fixed_power<2>(eigvalue_c1)*CnI_N[8] + eigvalue_c1*CnI_N[9] + eigvalue_c2*CnI_N[10] + (1/eigvalue_c3)*CnI_N[11] + CnI_N[12]));
+
+              AssertThrow(std::isfinite(F) && F >=0, ExcMessage("F = " + std::to_string(F)+" is not finite"));
+              AssertThrow(std::isfinite(G) && G >= 0, ExcMessage("G = " + std::to_string(G)+" is not finite"));
+              AssertThrow(std::isfinite(H) && H >= 0, ExcMessage("H = " + std::to_string(H)+" is not finite"));
+
+              AssertThrow(std::isfinite(L) && L >= 0, ExcMessage("L = " + std::to_string(L)+" is not finite"));
+              AssertThrow(std::isfinite(M) && M >= 0, ExcMessage("M = " + std::to_string(M)+" is not finite"));
+              AssertThrow(std::isfinite(N) && N >= 0, ExcMessage("N = " + std::to_string(N)+" is not finite"));
 
               // rotation matrix in Kelvin/Mandel notation
               Tensor<2,6> R_CPO_K;
@@ -477,9 +497,9 @@ namespace aspect
               out.viscosities[q] = scalar_viscosity;
 
               AssertThrow(std::isfinite(out.viscosities[q]),
-                          ExcMessage("Viscosity should be finite"));
+                          ExcMessage(std::to_string(F) + "  " + std::to_string(G) + "  " + std::to_string(H) + "  " + std::to_string(L) + "  "+ std::to_string(M) + "  "+ std::to_string(N) + "  " + std::to_string(Gamma) + "  " + std::to_string(out.viscosities[q])+ " Viscosity should be finite"));
               AssertThrow(out.viscosities[q] > 0,
-                          ExcMessage("Viscosity should be positive"));
+                          ExcMessage(std::to_string(out.viscosities[q])+"Viscosity should be positive"));
 
             }
           else // timestep == 0 or no anisotropic viscosity

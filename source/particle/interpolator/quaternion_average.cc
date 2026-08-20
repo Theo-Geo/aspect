@@ -47,6 +47,7 @@ namespace aspect
         AssertThrow(selected_properties.size() == not_quaternion_properties.size(), ExcMessage("component masks have unequal length") );
         ComponentMask selected_properties_not_quaternions = selected_properties & not_quaternion_properties;
 
+        AssertThrow(n_particles > 0, ExcMessage("A cell contains no particles. This case is not supported by the quaternion average"));
         // average quaternion for each mineral
         std::vector<std::array<double,4>> mean_quat (n_minerals);
 
