@@ -75,7 +75,14 @@ namespace aspect
          * They are used in computing rotation matrix with regards to the CPO reference frame, and
          * the anisotropic Hill coefficients FGHLMN.
          */
-        std::vector<double> cpo_bingham_avg_a, cpo_bingham_avg_b, cpo_bingham_avg_c;
+        // std::vector<double> cpo_bingham_avg_a, cpo_bingham_avg_b, cpo_bingham_avg_c;
+
+
+        /**
+         * experimental changes
+         */
+        std::array<double,4>cpo_quaternion_indices;
+        std::array<std::array<double,2>, 3> cpo_bingham_eigenvalues_indices;
 
         /**
          * These are arrays that store coefficients used to compute the anisotropic Hill coefficients FGHLMN from

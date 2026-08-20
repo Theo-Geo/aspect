@@ -96,20 +96,32 @@ namespace aspect
                                                             std::placeholders::_1,
                                                             std::placeholders::_2));
 
-      cpo_bingham_avg_a.push_back (this->introspection().compositional_index_for_name("phi1"));
-      cpo_bingham_avg_a.push_back (this->introspection().compositional_index_for_name("eigvalue_a1"));
-      cpo_bingham_avg_a.push_back (this->introspection().compositional_index_for_name("eigvalue_a2"));
-      cpo_bingham_avg_a.push_back (this->introspection().compositional_index_for_name("eigvalue_a3"));
+      // cpo_bingham_avg_a.push_back (this->introspection().compositional_index_for_name("phi1"));
+      // cpo_bingham_avg_a.push_back (this->introspection().compositional_index_for_name("eigvalue_a1"));
+      // cpo_bingham_avg_a.push_back (this->introspection().compositional_index_for_name("eigvalue_a2"));
+      // cpo_bingham_avg_a.push_back (this->introspection().compositional_index_for_name("eigvalue_a3"));
 
-      cpo_bingham_avg_b.push_back (this->introspection().compositional_index_for_name("theta"));
-      cpo_bingham_avg_b.push_back (this->introspection().compositional_index_for_name("eigvalue_b1"));
-      cpo_bingham_avg_b.push_back (this->introspection().compositional_index_for_name("eigvalue_b2"));
-      cpo_bingham_avg_b.push_back (this->introspection().compositional_index_for_name("eigvalue_b3"));
+      // cpo_bingham_avg_b.push_back (this->introspection().compositional_index_for_name("theta"));
+      // cpo_bingham_avg_b.push_back (this->introspection().compositional_index_for_name("eigvalue_b1"));
+      // cpo_bingham_avg_b.push_back (this->introspection().compositional_index_for_name("eigvalue_b2"));
+      // cpo_bingham_avg_b.push_back (this->introspection().compositional_index_for_name("eigvalue_b3"));
 
-      cpo_bingham_avg_c.push_back (this->introspection().compositional_index_for_name("phi2"));
-      cpo_bingham_avg_c.push_back (this->introspection().compositional_index_for_name("eigvalue_c1"));
-      cpo_bingham_avg_c.push_back (this->introspection().compositional_index_for_name("eigvalue_c2"));
-      cpo_bingham_avg_c.push_back (this->introspection().compositional_index_for_name("eigvalue_c3"));
+      // cpo_bingham_avg_c.push_back (this->introspection().compositional_index_for_name("phi2"));
+      // cpo_bingham_avg_c.push_back (this->introspection().compositional_index_for_name("eigvalue_c1"));
+      // cpo_bingham_avg_c.push_back (this->introspection().compositional_index_for_name("eigvalue_c2"));
+      // cpo_bingham_avg_c.push_back (this->introspection().compositional_index_for_name("eigvalue_c3"));
+      
+      cpo_quaternion_indices[0] = this->introspection().compositional_index_for_name("qw");
+      cpo_quaternion_indices[1] = this->introspection().compositional_index_for_name("qx");
+      cpo_quaternion_indices[2] = this->introspection().compositional_index_for_name("qy");
+      cpo_quaternion_indices[3] = this->introspection().compositional_index_for_name("qz");
+
+      cpo_bingham_eigenvalues_indices[0][0] = this->introspection().compositional_index_for_name("eigvalue_a1");
+      cpo_bingham_eigenvalues_indices[0][1] = this->introspection().compositional_index_for_name("eigvalue_a2");
+      cpo_bingham_eigenvalues_indices[1][0] = this->introspection().compositional_index_for_name("eigvalue_b1");
+      cpo_bingham_eigenvalues_indices[1][1] = this->introspection().compositional_index_for_name("eigvalue_b2");
+      cpo_bingham_eigenvalues_indices[2][0] = this->introspection().compositional_index_for_name("eigvalue_c1");
+      cpo_bingham_eigenvalues_indices[2][1] = this->introspection().compositional_index_for_name("eigvalue_c2");
     }
 
 
@@ -267,23 +279,42 @@ namespace aspect
             {
 
               // Get eigenvalues from compositional fields
+              // const std::vector<double> &composition = in.composition[q];
+              // const double eigvalue_a1 = composition[cpo_bingham_avg_a[1]];
+              // const double eigvalue_b1 = composition[cpo_bingham_avg_b[1]];
+              // const double eigvalue_c1 = composition[cpo_bingham_avg_c[1]];
+              // const double eigvalue_a2 = composition[cpo_bingham_avg_a[2]];
+              // const double eigvalue_b2 = composition[cpo_bingham_avg_b[2]];
+              // const double eigvalue_c2 = composition[cpo_bingham_avg_c[2]];
+              // const double eigvalue_a3 = composition[cpo_bingham_avg_a[3]];
+              // const double eigvalue_b3 = composition[cpo_bingham_avg_b[3]];
+              // const double eigvalue_c3 = composition[cpo_bingham_avg_c[3]];
+
+              // // Calculate the rotation matrix from the euler angles
+              // const double phi1 = composition[cpo_bingham_avg_a[0]];
+              // const double theta = composition[cpo_bingham_avg_b[0]];
+              // const double phi2 = composition[cpo_bingham_avg_c[0]];
+
+              //Get eigenvalues from compositional fields
               const std::vector<double> &composition = in.composition[q];
-              const double eigvalue_a1 = composition[cpo_bingham_avg_a[1]];
-              const double eigvalue_b1 = composition[cpo_bingham_avg_b[1]];
-              const double eigvalue_c1 = composition[cpo_bingham_avg_c[1]];
-              const double eigvalue_a2 = composition[cpo_bingham_avg_a[2]];
-              const double eigvalue_b2 = composition[cpo_bingham_avg_b[2]];
-              const double eigvalue_c2 = composition[cpo_bingham_avg_c[2]];
-              const double eigvalue_a3 = composition[cpo_bingham_avg_a[3]];
-              const double eigvalue_b3 = composition[cpo_bingham_avg_b[3]];
-              const double eigvalue_c3 = composition[cpo_bingham_avg_c[3]];
+              const double eigvalue_a1 = composition[cpo_bingham_eigenvalues_indices[0][0]];
+              const double eigvalue_a2 = composition[cpo_bingham_eigenvalues_indices[0][1]];
+              const double eigvalue_a3 = 1 - eigvalue_a1 - eigvalue_a2;
 
-              // Calculate the rotation matrix from the euler angles
-              const double phi1 = composition[cpo_bingham_avg_a[0]];
-              const double theta = composition[cpo_bingham_avg_b[0]];
-              const double phi2 = composition[cpo_bingham_avg_c[0]];
+              const double eigvalue_b1 = composition[cpo_bingham_eigenvalues_indices[1][0]];
+              const double eigvalue_b2 = composition[cpo_bingham_eigenvalues_indices[1][1]];
+              const double eigvalue_b3 = 1 - eigvalue_b1 - eigvalue_b2;
+              
+              const double eigvalue_c1 = composition[cpo_bingham_eigenvalues_indices[2][0]];
+              const double eigvalue_c2 = composition[cpo_bingham_eigenvalues_indices[2][1]];
+              const double eigvalue_c3 = 1 - eigvalue_c1 - eigvalue_c2;
 
-              const Tensor<2,3> R = Utilities::zxz_euler_angles_to_rotation_matrix(phi1*constants::radians_to_degree, theta*constants::radians_to_degree, phi2*constants::radians_to_degree);
+              std::array<double,4> cpo_quaternion;
+              for (unsigned int j=0; j<4;j++)
+                  cpo_quaternion[j] = composition[cpo_quaternion_indices[j]];
+
+              // const Tensor<2,3> R = Utilities::zxz_euler_angles_to_rotation_matrix(phi1*constants::radians_to_degree, theta*constants::radians_to_degree, phi2*constants::radians_to_degree);
+              const Tensor<2,3> R = Utilities::Quaternions::quaternion_to_rotation_matrix(cpo_quaternion);
 
               // initialize scalar viscosity
               double scalar_viscosity = composition[viscosity_field_index];
