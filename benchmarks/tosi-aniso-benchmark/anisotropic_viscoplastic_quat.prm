@@ -4,7 +4,7 @@ set Output directory                  = output-tosi-anisotropic-viscoplastic-qua
 
 set Dimension                         = 2
 set Use years instead of seconds      = false
-set End time                          = 0.1
+set End time                          = 0.2
 set Maximum first time step           = 1e-4
 set Nonlinear solver scheme           = single Advection, iterated Stokes
 set Nonlinear solver tolerance        = 1e-4
